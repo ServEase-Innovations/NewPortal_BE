@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+// Enums matching your SRS exactly
+enum EmployeeRole {
+  SuperAdmin
+  Manager
+  Developer
+  Marketing
+  CustomStaff
+}
+
+enum AppraisalState {
+  Pristine
+  AppraisalConsideration
+  PerformanceWarning
+}
+
+model Employee {
+  employeeId         String         @id @default(cuid()) @map("employee_id")
+  fullName           String         @map("full_name")
+  emailAddress       String         @unique @map("email_address")
+  assignedRole       EmployeeRole   @default(Developer) @map("assigned_role")
+  assignedDepartment String         @map("assigned_department")
+  appraisalState     AppraisalState @default(Pristine) @map("appraisal_state")
+  privateAdminNotes  String?        @map("private_admin_notes")
+  baseSalary         Decimal        @default(0) @map("base_salary") @db.Decimal(12, 2)
+  allowances         Decimal        @default(0) @db.Decimal(12, 2)
+  deductions         Decimal        @default(0) @db.Decimal(12, 2)
+  isActive           Boolean        @default(true) @map("is_active")
+  joinedAt           DateTime       @default(now()) @map("joined_at")
+
+  // Self-referential relation for manager hierarchy
+  managerId    String?    @map("manager_id")
+  manager      Employee?  @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
+  subordinates Employee[] @relation("ManagerSubordinates")
+
+  // Team relation
+  teamId String? @map("team_id")
+  team   Team?   @relation(fields: [teamId], references: [teamId])
+
+  @@map("employees")
+}
+
+model Team {
+  teamId            String   @id @default(cuid()) @map("team_id")
+  teamName          String   @unique @map("team_name")
+  projectTitle      String   @map("project_title")
+  projectSummary    String?  @map("project_summary")
+  milestoneDeadline DateTime @map("milestone_deadline")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  employees Employee[]
+
+  @@map("teams")
+}
