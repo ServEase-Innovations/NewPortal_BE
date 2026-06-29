@@ -2,12 +2,15 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import dotenv from 'dotenv';
 
-import employeeRoutes from './routes/employee.routes';
-import teamRoutes from './routes/team.routes';
+
 import authRoutes from './routes/auth.routes';
-import swaggerSpec from './swagger/swagger';
+
 
 dotenv.config();
+import employeeRoutes from "./routes/employee.routes";
+import swaggerSpec from "./swagger/swagger";
+import teamRoutes from "./routes/team.routes";
+import attendanceRoutes from "./routes/attendance.routes";
 
 const app = express();
 
@@ -20,13 +23,11 @@ app.get('/', (req, res) => {
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Routes
-app.use('/employees', employeeRoutes);
-app.use('/teams', teamRoutes);
+app.use("/employees", employeeRoutes);
+app.use("/teams", teamRoutes);
+app.use("/attendance", attendanceRoutes);
 app.use('/auth', authRoutes);
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
 });
