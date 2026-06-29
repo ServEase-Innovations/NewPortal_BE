@@ -41,7 +41,7 @@ model Employee {
   deductions         Decimal        @default(0) @db.Decimal(12, 2)
   isActive           Boolean        @default(true) @map("is_active")
   joinedAt           DateTime       @default(now()) @map("joined_at")
-
+  attendance Attendance[]
   // Self-referential relation for manager hierarchy
   managerId    String?    @map("manager_id")
   manager      Employee?  @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
@@ -67,4 +67,24 @@ model Team {
   employees Employee[]
 
   @@map("teams")
+}
+enum AttendanceStatus {
+  Working
+  OnLeave
+  Absent
+}
+model Attendance {
+  attendanceId       BigInt           @id @default(autoincrement()) @map("attendance_id")
+  employeeId         String           @map("employee_id")
+  calendarDate       DateTime         @map("calendar_date") @db.Date
+  shiftStatus        AttendanceStatus @default(Working) @map("shift_status")
+  clockInTimestamp   DateTime?        @map("clock_in_timestamp") @db.Time(6)
+  clockOutTimestamp  DateTime?        @map("clock_out_timestamp") @db.Time(6)
+  totalHoursComputed Decimal          @default(8.00) @map("total_hours_computed") @db.Decimal(4, 2)
+
+  employee Employee @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+
+  @@unique([employeeId, calendarDate], name: "unique_employee_date_entry")
+  @@index([employeeId, calendarDate], name: "idx_attendance_composite")
+  @@map("attendance")
 }
