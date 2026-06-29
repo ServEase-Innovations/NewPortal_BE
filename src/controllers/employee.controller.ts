@@ -1,8 +1,8 @@
+// src/controllers/employee.controller.ts
 import { Request, Response } from "express";
 import { createEmployeeService, deleteEmployeeService, getEmployeeByIdService, getEmployeesService, updateEmployeeService } from "../services/employee.service";
 import { createEmployeeSchema } from "../validations/employee.validation";
-
-
+import { hashPassword, generateUsername } from "../utils/auth.utils";
 
 export const createEmployee = async (
   req: Request,
@@ -18,11 +18,32 @@ export const createEmployee = async (
       });
     }
 
-    const employee = await createEmployeeService(
-      result.data
-    );
+    // Generate username and hash password if not provided
+    const username = generateUsername(result.data.fullName);
+    
+    // For employees created through this endpoint, set a default password
+    // or require password in the request
+    const defaultPassword = "Employee@123"; // Change this to something more secure
+    const hashedPassword = await hashPassword(defaultPassword);
 
-    res.status(201).json(employee);
+    const employeeData = {
+      ...result.data,
+      username: username,
+      password: hashedPassword,
+    };
+
+    const employee = await createEmployeeService(employeeData);
+
+    res.status(201).json({
+      message: "Employee created successfully",
+      employee: {
+        employeeId: employee.employeeId,
+        fullName: employee.fullName,
+        username: employee.username,
+        emailAddress: employee.emailAddress,
+        assignedRole: employee.assignedRole,
+      }
+    });
 
   } catch (error) {
     console.error(error);

@@ -13,13 +13,14 @@ model User {
   createdAt DateTime @default(now())
 }
 
-// Enums matching your SRS exactly
+// Enums matching your SRS exactly with HR added
 enum EmployeeRole {
   SuperAdmin
   Manager
   Developer
   Marketing
   CustomStaff
+  HR  
 }
 
 enum AppraisalState {
@@ -42,14 +43,18 @@ model Employee {
   isActive           Boolean        @default(true) @map("is_active")
   joinedAt           DateTime       @default(now()) @map("joined_at")
 
-  // Self-referential relation for manager hierarchy
   managerId    String?    @map("manager_id")
   manager      Employee?  @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
   subordinates Employee[] @relation("ManagerSubordinates")
 
-  // Team relation
   teamId String? @map("team_id")
   team   Team?   @relation(fields: [teamId], references: [teamId])
+
+  // Authentication fields
+  username     String   @unique @map("username")
+  password     String   @map("password")
+  lastLogin    DateTime? @map("last_login")
+  refreshToken String?  @map("refresh_token")
 
   @@map("employees")
 }

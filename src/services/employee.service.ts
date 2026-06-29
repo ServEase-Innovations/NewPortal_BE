@@ -1,3 +1,4 @@
+// src/services/employee.service.ts
 import prisma from "../prisma";
 
 export const createEmployeeService = async (data: any) => {
@@ -7,7 +8,25 @@ export const createEmployeeService = async (data: any) => {
 };
 
 export const getEmployeesService = async () => {
-  return prisma.employee.findMany();
+  return prisma.employee.findMany({
+    // Exclude sensitive fields
+    select: {
+      employeeId: true,
+      fullName: true,
+      emailAddress: true,
+      assignedRole: true,
+      assignedDepartment: true,
+      appraisalState: true,
+      baseSalary: true,
+      allowances: true,
+      deductions: true,
+      isActive: true,
+      joinedAt: true,
+      username: true,
+      teamId: true,
+      managerId: true,
+    }
+  });
 };
 
 export const getEmployeeByIdService = async (id: string) => {
@@ -15,6 +34,23 @@ export const getEmployeeByIdService = async (id: string) => {
     where: {
       employeeId: id,
     },
+    select: {
+      employeeId: true,
+      fullName: true,
+      emailAddress: true,
+      assignedRole: true,
+      assignedDepartment: true,
+      appraisalState: true,
+      baseSalary: true,
+      allowances: true,
+      deductions: true,
+      isActive: true,
+      joinedAt: true,
+      username: true,
+      lastLogin: true,
+      teamId: true,
+      managerId: true,
+    }
   });
 };
 
