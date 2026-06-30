@@ -24,6 +24,7 @@ export const loginService = async (
   if (!isPasswordCorrect) {
     throw new Error("Invalid username or password");
   }
+  
 
  const token = jwt.sign(
   {
