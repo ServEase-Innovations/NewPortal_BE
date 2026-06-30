@@ -8,6 +8,10 @@ export const createEmployeeSchema = z.object({
   emailAddress: z
     .email("Invalid email address"),
 
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters"),
+
   assignedRole: z.enum([
     "SuperAdmin",
     "Manager",
