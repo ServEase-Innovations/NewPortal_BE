@@ -6,6 +6,8 @@ import {
   getEmployeeById,
   updateEmployee,
   deleteEmployee,
+  registerEmployee,
+  getProfile,
 } from "../controllers/employee.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 
@@ -13,9 +15,95 @@ const router = Router();
 
 /**
  * @swagger
+ * /employees/register:
+ *   post:
+ *     summary: Register a new employee
+ *     description: Creates a new employee with auto-generated username and hashed password
+ *     tags:
+ *       - Employees
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fullName
+ *               - emailAddress
+ *               - assignedRole
+ *               - assignedDepartment
+ *               - password
+ *               - confirmPassword
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *                 example: John Doe
+ *               emailAddress:
+ *                 type: string
+ *                 example: john.doe@company.com
+ *               assignedRole:
+ *                 type: string
+ *                 enum: [SuperAdmin, Manager, Developer, Marketing, CustomStaff, HR]
+ *                 example: Developer
+ *               assignedDepartment:
+ *                 type: string
+ *                 example: Engineering
+ *               baseSalary:
+ *                 type: number
+ *                 example: 60000
+ *               allowances:
+ *                 type: number
+ *                 example: 5000
+ *               deductions:
+ *                 type: number
+ *                 example: 1000
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *                 example: Password123!
+ *               confirmPassword:
+ *                 type: string
+ *                 minLength: 8
+ *                 example: Password123!
+ *     responses:
+ *       201:
+ *         description: Employee registered successfully
+ *       400:
+ *         description: Validation failed
+ *       409:
+ *         description: Username or email already exists
+ *       500:
+ *         description: Server error
+ */
+router.post('/register', registerEmployee);
+
+/**
+ * @swagger
+ * /employees/profile:
+ *   get:
+ *     summary: Get employee profile
+ *     description: Get current employee's profile information
+ *     tags:
+ *       - Employees
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile fetched successfully
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: Employee not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/profile', authenticate, getProfile);
+
+/**
+ * @swagger
  * /employees:
  *   post:
- *     summary: Create a new employee
+ *     summary: Create a new employee (Admin only)
  *     description: Creates a new employee in the database. Requires SuperAdmin or HR role.
  *     tags:
  *       - Employees
@@ -397,54 +485,5 @@ router.delete(
   authorize("SuperAdmin"),
   deleteEmployee
 );
-
-/**
- * @swagger
- * /employees/{id}/status:
- *   patch:
- *     summary: Toggle employee active status
- *     description: Activates or deactivates an employee. Requires SuperAdmin or HR role.
- *     tags:
- *       - Employees
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: Employee ID
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - isActive
- *             properties:
- *               isActive:
- *                 type: boolean
- *                 example: false
- *     responses:
- *       200:
- *         description: Employee status updated successfully
- *       401:
- *         description: Authentication required
- *       403:
- *         description: Insufficient permissions
- *       404:
- *         description: Employee not found
- *       500:
- *         description: Server error
- */
-// Note: You'll need to add this controller function
-// router.patch(
-//   "/:id/status",
-//   authenticate,
-//   authorize("SuperAdmin", "HR"),
-//   toggleEmployeeStatus
-// );
 
 export default router;

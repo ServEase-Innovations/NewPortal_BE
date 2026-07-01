@@ -21,11 +21,13 @@ interface LoginData {
 
 export const registerService = async (data: RegisterData) => {
   try {
-    // Hash the password
+    // Hash ONLY the password
     const hashedPassword = await hashPassword(data.password);
+    
+    // Generate username
     let username = generateUsername(data.fullName);
     
-    // Check if username already exists using findFirst
+    // Check if username already exists
     let existingUser = await prisma.employee.findFirst({
       where: { username },
     });
@@ -45,7 +47,7 @@ export const registerService = async (data: RegisterData) => {
       username = `${username}${Date.now().toString().slice(-6)}`;
     }
     
-    // Create employee with hashed password
+    // Create employee - Prisma will auto-generate employeeId (CUID)
     const employee = await prisma.employee.create({
       data: {
         fullName: data.fullName,
@@ -56,7 +58,7 @@ export const registerService = async (data: RegisterData) => {
         allowances: data.allowances,
         deductions: data.deductions,
         username: username,
-        password: hashedPassword,
+        password: hashedPassword, // Only password is hashed
       },
     });
     

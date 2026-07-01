@@ -80,7 +80,7 @@ enum AttendanceStatus {
   Absent
 }
 model Attendance {
-  attendanceId       BigInt           @id @default(autoincrement()) @map("attendance_id")
+  attendanceId       Int              @id @default(autoincrement()) @map("attendance_id")
   employeeId         String           @map("employee_id")
   calendarDate       DateTime         @map("calendar_date") @db.Date
   shiftStatus        AttendanceStatus @default(Working) @map("shift_status")

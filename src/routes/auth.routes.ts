@@ -1,70 +1,9 @@
+// src/routes/auth.routes.ts
 import { Router } from 'express';
-import { register, login, refreshToken, logout, getProfile } from '../controllers/auth.controller';
+import { login, refreshToken, logout } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
-
-/**
- * @swagger
- * /auth/register:
- *   post:
- *     summary: Register a new employee
- *     description: Creates a new employee with auto-generated username and hashed password
- *     tags:
- *       - Authentication
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - fullName
- *               - emailAddress
- *               - assignedRole
- *               - assignedDepartment
- *               - password
- *               - confirmPassword
- *             properties:
- *               fullName:
- *                 type: string
- *                 example: John Doe
- *               emailAddress:
- *                 type: string
- *                 example: john.doe@company.com
- *               assignedRole:
- *                 type: string
- *                 enum: [SuperAdmin, Manager, Developer, Marketing, CustomStaff]
- *                 example: Developer
- *               assignedDepartment:
- *                 type: string
- *                 example: Engineering
- *               baseSalary:
- *                 type: number
- *                 example: 60000
- *               allowances:
- *                 type: number
- *                 example: 5000
- *               deductions:
- *                 type: number
- *                 example: 1000
- *               password:
- *                 type: string
- *                 minLength: 8
- *                 example: Password123!
- *               confirmPassword:
- *                 type: string
- *                 minLength: 8
- *                 example: Password123!
- *     responses:
- *       201:
- *         description: Employee registered successfully
- *       400:
- *         description: Validation failed
- *       500:
- *         description: Server error
- */
-router.post('/register', register);
 
 /**
  * @swagger
@@ -151,27 +90,5 @@ router.post('/refresh-token', refreshToken);
  *         description: Server error
  */
 router.post('/logout', authenticate, logout);
-
-/**
- * @swagger
- * /auth/profile:
- *   get:
- *     summary: Get employee profile
- *     description: Get current employee's profile information
- *     tags:
- *       - Authentication
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Profile fetched successfully
- *       401:
- *         description: Authentication required
- *       404:
- *         description: Employee not found
- *       500:
- *         description: Server error
- */
-router.get('/profile', authenticate, getProfile);
 
 export default router;

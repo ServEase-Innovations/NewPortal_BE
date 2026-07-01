@@ -10,12 +10,12 @@ export const createEmployeeSchema = z.object({
     "Developer",
     "Marketing",
     "CustomStaff",
-    "HR",  // Added HR
+    "HR",
   ]),
   assignedDepartment: z.string().min(2, "Department is required"),
-  baseSalary: z.number().min(0, "Salary cannot be negative"),
-  allowances: z.number().min(0),
-  deductions: z.number().min(0),
+  baseSalary: z.number().min(0, "Salary cannot be negative").optional(),
+  allowances: z.number().min(0).optional(),
+  deductions: z.number().min(0).optional(),
   username: z.string().optional(),
-  password: z.string().optional(),
+  password: z.string().min(6, "Password must be at least 6 characters").optional(),
 });
