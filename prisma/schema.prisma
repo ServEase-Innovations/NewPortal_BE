@@ -6,33 +6,32 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  createdAt DateTime @default(now())
-}
-
 model Employee {
-  employeeId         String         @id @map("employee_id")
+  employeeId         String         @id @default(uuid()) @map("employee_id")
   fullName           String         @map("full_name")
   emailAddress       String         @unique @map("email_address")
   assignedRole       EmployeeRole   @default(Developer) @map("assigned_role")
   assignedDepartment String         @map("assigned_department")
   appraisalState     AppraisalState @default(Pristine) @map("appraisal_state")
   privateAdminNotes  String?        @map("private_admin_notes")
+
   baseSalary         Decimal        @default(0) @map("base_salary") @db.Decimal(12, 2)
   allowances         Decimal        @default(0) @db.Decimal(12, 2)
   deductions         Decimal        @default(0) @db.Decimal(12, 2)
+
   isActive           Boolean        @default(true) @map("is_active")
   joinedAt           DateTime       @default(now()) @map("joined_at")
+
   managerId          String?        @map("manager_id")
   teamId             String?        @map("team_id")
+
   last_login         DateTime?
   password           String
   refresh_token      String?
   username           String         @unique
+
   attendance         Attendance[]
+
   manager            Employee?      @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
   subordinates       Employee[]     @relation("ManagerSubordinates")
   team               Team?          @relation(fields: [teamId], references: [teamId])
@@ -48,6 +47,7 @@ model Team {
   milestoneDeadline DateTime   @map("milestone_deadline")
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
+
   employees         Employee[]
 
   @@map("teams")
@@ -61,6 +61,7 @@ model Attendance {
   clockInTimestamp   DateTime?        @map("clock_in_timestamp") @db.Time(6)
   clockOutTimestamp  DateTime?        @map("clock_out_timestamp") @db.Time(6)
   totalHoursComputed Decimal          @default(8.00) @map("total_hours_computed") @db.Decimal(4, 2)
+
   employee           Employee         @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
 
   @@unique([employeeId, calendarDate], name: "unique_employee_date_entry")
@@ -81,4 +82,10 @@ enum AttendanceStatus {
   Working
   OnLeave
   Absent
+}
+
+enum AppraisalState {
+  Pristine
+  InProgress
+  Completed
 }
