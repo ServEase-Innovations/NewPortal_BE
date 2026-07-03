@@ -1,14 +1,23 @@
 import { Router } from "express";
-import { login } from "../controllers/auth.controller";
+import {
+  login,
+  logout,
+} from "../controllers/auth.controller";
 
 const router = Router();
+
+/**
+ * @swagger
+ * tags:
+ *   name: Authentication
+ *   description: Authentication APIs
+ */
 
 /**
  * @swagger
  * /auth/login:
  *   post:
  *     summary: Employee Login
- *     description: Login using username and password. Returns a JWT token.
  *     tags:
  *       - Authentication
  *     requestBody:
@@ -17,22 +26,31 @@ const router = Router();
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - username
- *               - password
  *             properties:
  *               username:
  *                 type: string
  *                 example: roydiy
  *               password:
  *                 type: string
- *                 example: 123456
+ *                 example: Diya@2003
  *     responses:
  *       200:
  *         description: Login successful
- *       401:
- *         description: Invalid username or password
  */
 router.post("/login", login);
+
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Employee Logout
+ *     description: Logout employee
+ *     tags:
+ *       - Authentication
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ */
+router.post("/logout", logout);
 
 export default router;

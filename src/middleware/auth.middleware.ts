@@ -1,39 +1,36 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-export const authenticateToken = (
+export const authMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader) {
+  if (
+    !authHeader ||
+    !authHeader.startsWith("Bearer ")
+  ) {
     return res.status(401).json({
-      message: "Access denied. No token provided.",
+      message: "Access denied",
     });
   }
 
   const token = authHeader.split(" ")[1];
 
-  if (!token) {
-    return res.status(401).json({
-      message: "Invalid token format.",
-    });
-  }
-
   try {
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET!
+      process.env.JWT_SECRET as string
     );
 
-    (req as any).user = decoded;
+    (req as any).employee = decoded;
 
     next();
   } catch (error) {
     return res.status(401).json({
-      message: "Invalid or expired token.",
+      message: "Invalid token",
     });
   }
 };

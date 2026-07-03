@@ -14,7 +14,7 @@ model User {
 }
 
 model Employee {
-  employeeId         String         @id @default(cuid()) @map("employee_id")
+  employeeId         String         @id @map("employee_id")
   fullName           String         @map("full_name")
   emailAddress       String         @unique @map("email_address")
   assignedRole       EmployeeRole   @default(Developer) @map("assigned_role")
@@ -28,7 +28,9 @@ model Employee {
   joinedAt           DateTime       @default(now()) @map("joined_at")
   managerId          String?        @map("manager_id")
   teamId             String?        @map("team_id")
+  last_login         DateTime?
   password           String
+  refresh_token      String?
   username           String         @unique
   attendance         Attendance[]
   manager            Employee?      @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
@@ -52,7 +54,7 @@ model Team {
 }
 
 model Attendance {
-  attendanceId       BigInt           @id @default(autoincrement()) @map("attendance_id")
+  attendanceId       Int              @id @default(autoincrement()) @map("attendance_id")
   employeeId         String           @map("employee_id")
   calendarDate       DateTime         @map("calendar_date") @db.Date
   shiftStatus        AttendanceStatus @default(Working) @map("shift_status")
@@ -72,12 +74,7 @@ enum EmployeeRole {
   Developer
   Marketing
   CustomStaff
-}
-
-enum AppraisalState {
-  Pristine
-  AppraisalConsideration
-  PerformanceWarning
+  HR
 }
 
 enum AttendanceStatus {

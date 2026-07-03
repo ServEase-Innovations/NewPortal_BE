@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { loginSchema } from "../validations/auth.validation";
 import { loginService } from "../services/auth.service";
 
 export const login = async (
@@ -7,32 +6,29 @@ export const login = async (
   res: Response
 ) => {
   try {
-    const result = loginSchema.safeParse(req.body);
+    const { username, password } = req.body;
 
-    if (!result.success) {
-      return res.status(400).json({
-        message: "Validation failed",
-        errors: result.error.flatten(),
-      });
-    }
-
-    const { username, password } = result.data;
-
-    const response = await loginService(
+    const result = await loginService(
       username,
       password
     );
 
-    return res.status(200).json({
+    res.status(200).json({
       message: "Login successful",
-      token: response.token,
-      employee: response.employee,
+      ...result,
     });
   } catch (error: any) {
-    console.error(error);
-
-    return res.status(401).json({
-      message: error.message || "Invalid username or password",
+    res.status(401).json({
+      message: error.message,
     });
   }
+};
+
+export const logout = async (
+  req: Request,
+  res: Response
+) => {
+  res.status(200).json({
+    message: "Logout successful",
+  });
 };

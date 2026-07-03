@@ -1,16 +1,11 @@
 import { z } from "zod";
 
 export const createEmployeeSchema = z.object({
-  fullName: z
-    .string()
-    .min(3, "Full name must be at least 3 characters"),
+  fullName: z.string().min(3),
 
-  emailAddress: z
-    .email("Invalid email address"),
+  emailAddress: z.email(),
 
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters"),
+  password: z.string().min(8),
 
   assignedRole: z.enum([
     "SuperAdmin",
@@ -20,19 +15,21 @@ export const createEmployeeSchema = z.object({
     "CustomStaff",
   ]),
 
-  assignedDepartment: z
-    .string()
-    .min(2, "Department is required"),
+  assignedDepartment: z.string(),
 
-  baseSalary: z
-    .number()
-    .min(0, "Salary cannot be negative"),
+  baseAddress: z.string(),
 
-  allowances: z
-    .number()
-    .min(0),
+  workAddress: z.string(),
 
-  deductions: z
-    .number()
-    .min(0),
+  baseSalary: z.number(),
+
+  allowances: z.number(),
+
+  deductions: z.number(),
+
+  // Team ID is cuid string
+  teamId: z.string().optional(),
+
+  // Employee ID is integer
+  managerId: z.number().int().optional(),
 });
