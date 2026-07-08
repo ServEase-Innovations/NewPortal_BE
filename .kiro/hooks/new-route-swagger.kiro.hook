@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Generate Swagger for New Routes",
+  "description": "Automatically generates complete Swagger documentation for newly created route files, ensuring proper API documentation standards from the start",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "src/routes/*.ts",
+      "src/routes/*.js"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new route file was just created. Please:\n1. Review the route file to understand all endpoints\n2. Generate complete Swagger/OpenAPI JSDoc documentation for ALL endpoints including:\n   - @swagger tag for each route\n   - Summary and detailed description\n   - Appropriate tags (use the entity name like Employees, Teams, etc.)\n   - Security requirements (bearerAuth) if authentication is needed\n   - Request body schemas with all required and optional fields\n   - All response codes with descriptions (200, 201, 400, 401, 403, 404, 500)\n   - Example values for all fields\n   - Parameter definitions for path/query params\n3. Follow the documentation pattern used in other route files (like employee.routes.ts)\n4. Ensure the swagger configuration in swagger.ts includes this new tag\n\nAdd comprehensive documentation so the API is fully documented in Swagger UI."
+  }
+}
