@@ -17,9 +17,11 @@ import { registerEmployeeSchema } from "../validations/auth.validation";
 // REGISTER endpoint moved from auth
 export const registerEmployee = async (req: Request, res: Response) => {
   try {
+    console.log('Register request body:', req.body);
     const result = registerEmployeeSchema.safeParse(req.body);
 
     if (!result.success) {
+      console.log('Validation error:', result.error);
       return res.status(400).json({
         message: 'Validation failed',
         errors: result.error.flatten(),
@@ -27,6 +29,7 @@ export const registerEmployee = async (req: Request, res: Response) => {
     }
 
     const { confirmPassword, ...registerData } = result.data;
+    console.log('Register data after validation:', registerData);
     
     const employee = await registerService(registerData);
 
@@ -42,6 +45,7 @@ export const registerEmployee = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Registration error:', error);
+    console.error('Error stack:', error.stack);
     
     if (error.code === 'P2002') {
       return res.status(409).json({
@@ -51,6 +55,7 @@ export const registerEmployee = async (req: Request, res: Response) => {
     
     res.status(500).json({
       message: 'Failed to register employee',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
