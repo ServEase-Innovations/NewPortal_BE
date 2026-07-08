@@ -50,7 +50,7 @@ export const getAttendance = async (
     const attendance = await getAttendanceService();
 
     res.json(
-      attendance.map((item) =>
+      attendance.map((item:any) =>
         serializeAttendance(item)
       )
     );
