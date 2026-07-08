@@ -1,5 +1,6 @@
 // src/swagger/swagger.ts
 import swaggerJsdoc from 'swagger-jsdoc';
+import path from 'path';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -15,7 +16,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: 'http://localhost:5000',
+        url: 'http://localhost:3000',
         description: 'Development Server',
       },
     ],
@@ -47,27 +48,17 @@ const options: swaggerJsdoc.Options = {
         name: 'Teams',
         description: 'Team management endpoints',
       },
-    ],
-
-    // 👇 Add this
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: "http",
-          scheme: "bearer",
-          bearerFormat: "JWT",
-        },
-      },
-    },
-
-    // 👇 Add this
-    security: [
       {
-        bearerAuth: [],
+        name: 'Attendance',
+        description: 'Attendance tracking endpoints',
       },
     ],
   },
-  apis: ['./src/routes/*.ts'],
+  // Use absolute paths to route files
+  apis: [
+    path.join(__dirname, '../routes/*.ts'),
+    path.join(__dirname, '../routes/*.js'),
+  ],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

@@ -13,6 +13,7 @@ import attendanceRoutes from "./routes/attendance.routes";
 dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
@@ -26,7 +27,18 @@ app.get('/', (req, res) => {
 });
 
 // Swagger documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api-docs', swaggerUi.serve);
+app.get('/api-docs', swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "Employee Management API Docs"
+}));
+
+// Swagger JSON endpoint
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 
 // Routes
 app.use("/employees", employeeRoutes);
@@ -34,6 +46,8 @@ app.use("/teams", teamRoutes);
 app.use("/attendance", attendanceRoutes);
 app.use("/auth", authRoutes);
 
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Swagger UI available at: http://localhost:${PORT}/api-docs`);
+  console.log(`Swagger JSON available at: http://localhost:${PORT}/api-docs.json`);
 });
