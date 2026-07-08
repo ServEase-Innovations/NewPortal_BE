@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Auto-Generate Swagger Docs",
+  "description": "Automatically prompts the agent to review route files and ensure Swagger documentation is complete and up-to-date whenever route files are created or modified",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/routes/*.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A route file was just modified. Please review the route file and ensure all endpoints have complete Swagger/OpenAPI documentation with proper JSDoc comments including:\n- Summary and description\n- Tags\n- Request body schema (if applicable)\n- All possible response codes (200, 201, 400, 401, 403, 404, 500, etc.)\n- Security requirements (bearerAuth if authentication is needed)\n- Parameter definitions\n- Example values\n\nCheck if any endpoints are missing documentation and add it following the existing pattern in the project."
+  }
+}

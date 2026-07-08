@@ -49,3 +49,45 @@ export const loginService = async (
     },
   };
 };
+
+
+export const registerService = async (data: {
+  fullName: string;
+  emailAddress: string;
+  assignedRole: string;
+  assignedDepartment: string;
+  password: string;
+  baseSalary?: number;
+  allowances?: number;
+  deductions?: number;
+}) => {
+  // Generate username from full name
+  const generateUsername = (fullName: string): string => {
+    const nameParts = fullName.toLowerCase().split(' ').filter(Boolean);
+    const baseUsername = nameParts.join('.');
+    const randomSuffix = Math.floor(Math.random() * 1000);
+    return `${baseUsername}${randomSuffix}`;
+  };
+
+  const username = generateUsername(data.fullName);
+
+  // Hash password
+  const hashedPassword = await bcrypt.hash(data.password, 10);
+
+  // Create employee
+  const employee = await prisma.employee.create({
+    data: {
+      fullName: data.fullName,
+      emailAddress: data.emailAddress,
+      username: username,
+      password: hashedPassword,
+      assignedRole: data.assignedRole as any,
+      assignedDepartment: data.assignedDepartment,
+      baseSalary: data.baseSalary || 0,
+      allowances: data.allowances || 0,
+      deductions: data.deductions || 0,
+    },
+  });
+
+  return employee;
+};

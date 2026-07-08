@@ -142,3 +142,22 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
+
+# Documentation files (generated guides and troubleshooting)
+# Keep README.md by excluding it specifically
+*.md
+!README.md
+
+# Specifically exclude generated documentation
+TROUBLESHOOTING_CONNECTION.md
+FIX_CONNECTION_NOW.md
+MIGRATION_FIX_README.md
+PRISMA_SETUP_COMPLETE.md
+QUICK_START.md
+README_CURRENT_STATUS.md
+SUCCESS_READY_TO_GO.md
+MERGE_COMPLETE.md
+SWAGGER_AUTO_GENERATION.md
+AUTO_SWAGGER_SETUP_COMPLETE.md
+MIGRATION_FIX_README.md
+prisma/MIGRATIONS.md
