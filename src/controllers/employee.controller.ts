@@ -63,6 +63,8 @@ export const registerEmployee = async (req: Request, res: Response) => {
 // PROFILE endpoint moved from auth
 export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
+    console.log('Getting profile for:', req.employee);
+    
     if (!req.employee) {
       return res.status(401).json({
         message: 'Authentication required',
@@ -82,7 +84,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         allowances: true,
         deductions: true,
         joinedAt: true,
-        lastLogin: true,
+        last_login: true,
         isActive: true,
       },
     });
@@ -94,10 +96,12 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
     }
 
     res.json(employee);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get profile error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       message: 'Failed to fetch profile',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
