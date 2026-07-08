@@ -32,7 +32,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/employees", employeeRoutes);
 app.use("/teams", teamRoutes);
 app.use("/attendance", attendanceRoutes);
-app.use('/auth', authRoutes);
+app.use("/auth", authRoutes);
 
 app.listen(5000, () => {
   console.log("Server running on port 5000");

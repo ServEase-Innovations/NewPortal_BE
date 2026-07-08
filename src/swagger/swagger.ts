@@ -48,6 +48,24 @@ const options: swaggerJsdoc.Options = {
         description: 'Team management endpoints',
       },
     ],
+
+    // 👇 Add this
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },
+
+    // 👇 Add this
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
   apis: ['./src/routes/*.ts'],
 };
