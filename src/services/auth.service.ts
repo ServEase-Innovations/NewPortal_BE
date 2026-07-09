@@ -61,12 +61,24 @@ export const registerService = async (data: {
   allowances?: number;
   deductions?: number;
 }) => {
-  // Generate username from full name
+  // Generate username: first 3 chars of first name + first 3 chars of last name
   const generateUsername = (fullName: string): string => {
-    const nameParts = fullName.toLowerCase().split(' ').filter(Boolean);
-    const baseUsername = nameParts.join('.');
-    const randomSuffix = Math.floor(Math.random() * 1000);
-    return `${baseUsername}${randomSuffix}`;
+    const nameParts = fullName.trim().split(' ').filter(Boolean);
+    
+    if (nameParts.length === 0) {
+      throw new Error('Invalid full name');
+    }
+    
+    // Get first name (first part) and last name (last part)
+    const firstName = nameParts[0].toLowerCase();
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : '';
+    
+    // Take first 3 characters of each (or less if name is shorter)
+    const firstPart = firstName.substring(0, 3);
+    const lastPart = lastName.substring(0, 3);
+    
+    // Combine: first3chars + last3chars
+    return `${firstPart}${lastPart}`;
   };
 
   const username = generateUsername(data.fullName);
