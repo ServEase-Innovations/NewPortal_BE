@@ -54,13 +54,16 @@ const options: swaggerJsdoc.Options = {
       },
     ],
   },
-  // Use absolute paths to route files
-  apis: [
-    path.join(__dirname, '../routes/*.ts'),
-    path.join(__dirname, '../routes/*.js'),
-  ],
+  // Use relative paths from project root
+  apis: ['./src/routes/*.ts', './src/routes/*.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(options);
+
+// Log to help debug
+console.log('Swagger API paths found:', Object.keys(swaggerSpec.paths || {}).length);
+if (Object.keys(swaggerSpec.paths || {}).length === 0) {
+  console.warn('⚠️  No API paths found! Check route files have @swagger comments');
+}
 
 export default swaggerSpec;
