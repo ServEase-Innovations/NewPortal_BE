@@ -195,6 +195,7 @@ export const getEmployeeById = async (
   res: Response
 ) => {
   try {
+    console.log('Getting employee by ID:', req.params.id);
     const employee = await getEmployeeByIdService(
       req.params.id
     );
@@ -207,11 +208,13 @@ export const getEmployeeById = async (
     }
 
     res.json(employee);
-  } catch (error) {
-    console.error(error);
+  } catch (error: any) {
+    console.error('Error in getEmployeeById:', error);
+    console.error('Error stack:', error.stack);
 
     res.status(500).json({
       message: "Failed to fetch employee",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

@@ -49,7 +49,7 @@ export const getEmployeeByIdService = async (id: string) => {
       isActive: true,
       joinedAt: true,
       username: true,
-      lastLogin: true,
+      last_login: true,
       teamId: true,
       managerId: true,
     }
