@@ -30,7 +30,8 @@ export const loginService = async (
   {
     employeeId: employee.employeeId,
     username: employee.username,
-    role: employee.assignedRole,
+    emailAddress: employee.emailAddress,
+    assignedRole: employee.assignedRole,
   },
   process.env.JWT_SECRET as string,
   {
