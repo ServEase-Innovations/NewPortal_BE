@@ -10,6 +10,28 @@ import {
 
 import { createTeamSchema } from "../validations/team.validation";
 
+// Serialization helper to convert BigInt timestamps to ISO strings
+const serializeTeam = (team: any) => {
+  if (!team) return null;
+  
+  return {
+    ...team,
+    milestoneDeadline: team.milestoneDeadline ? new Date(Number(team.milestoneDeadline)).toISOString() : null,
+    createdAt: team.createdAt ? new Date(Number(team.createdAt)).toISOString() : null,
+    updatedAt: team.updatedAt ? new Date(Number(team.updatedAt)).toISOString() : null,
+    // Serialize nested employees if present
+    employees: team.employees ? team.employees.map((emp: any) => ({
+      ...emp,
+      joinedAt: emp.joinedAt ? new Date(Number(emp.joinedAt)).toISOString() : null,
+      last_login: emp.last_login ? new Date(Number(emp.last_login)).toISOString() : null,
+    })) : undefined,
+  };
+};
+
+const serializeTeams = (teams: any[]) => {
+  return teams.map(serializeTeam);
+};
+
 export const createTeam = async (
   req: Request,
   res: Response
@@ -26,7 +48,7 @@ export const createTeam = async (
 
     const team = await createTeamService(result.data);
 
-    res.status(201).json(team);
+    res.status(201).json(serializeTeam(team));
 
   } catch (error) {
     console.error(error);
@@ -44,7 +66,7 @@ export const getTeams = async (
   try {
     const teams = await getTeamsService();
 
-    res.json(teams);
+    res.json(serializeTeams(teams));
 
   } catch (error) {
     res.status(500).json({
@@ -68,7 +90,7 @@ export const getTeamById = async (
       });
     }
 
-    res.json(team);
+    res.json(serializeTeam(team));
 
   } catch (error) {
     res.status(500).json({
@@ -87,7 +109,7 @@ export const updateTeam = async (
       req.body
     );
 
-    res.json(team);
+    res.json(serializeTeam(team));
 
   } catch (error) {
     res.status(500).json({

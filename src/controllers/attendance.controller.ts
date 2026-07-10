@@ -9,9 +9,13 @@ import {
 
 import { createAttendanceSchema, updateAttendanceSchema } from "../validations/attendance.validation";
 
+// Serialization helper to convert BigInt timestamps to ISO strings
 const serializeAttendance = (attendance: any) => ({
   ...attendance,
   attendanceId: attendance.attendanceId.toString(),
+  calendarDate: attendance.calendarDate 
+    ? new Date(Number(attendance.calendarDate)).toISOString()
+    : null,
   clockInTimestamp: attendance.clockInTimestamp 
     ? new Date(Number(attendance.clockInTimestamp)).toISOString()
     : null,
@@ -35,6 +39,12 @@ export const createAttendance = async (
     }
 
     const data: any = { ...result.data };
+
+    // Convert calendarDate to epoch milliseconds (BigInt)
+    if (data.calendarDate) {
+      const date = new Date(data.calendarDate);
+      data.calendarDate = BigInt(date.getTime());
+    }
 
     // Convert ISO timestamp strings to epoch milliseconds (BigInt)
     if (data.clockInTimestamp) {

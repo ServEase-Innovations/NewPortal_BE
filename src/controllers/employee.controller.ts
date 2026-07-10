@@ -14,6 +14,21 @@ import prisma from '../prisma';
 import { registerService } from "../services/auth.service";
 import { registerEmployeeSchema } from "../validations/auth.validation";
 
+// Serialization helper to convert BigInt timestamps to ISO strings
+const serializeEmployee = (employee: any) => {
+  if (!employee) return null;
+  
+  return {
+    ...employee,
+    joinedAt: employee.joinedAt ? new Date(Number(employee.joinedAt)).toISOString() : null,
+    last_login: employee.last_login ? new Date(Number(employee.last_login)).toISOString() : null,
+  };
+};
+
+const serializeEmployees = (employees: any[]) => {
+  return employees.map(serializeEmployee);
+};
+
 // REGISTER endpoint moved from auth
 export const registerEmployee = async (req: Request, res: Response) => {
   try {
@@ -35,13 +50,14 @@ export const registerEmployee = async (req: Request, res: Response) => {
 
     res.status(201).json({
       message: 'Employee registered successfully',
-      employee: {
+      employee: serializeEmployee({
         employeeId: employee.employeeId,
         fullName: employee.fullName,
         username: employee.username,
         emailAddress: employee.emailAddress,
         assignedRole: employee.assignedRole,
-      },
+        joinedAt: employee.joinedAt,
+      }),
     });
   } catch (error: any) {
     console.error('Registration error:', error);
@@ -95,7 +111,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    res.json(employee);
+    res.json(serializeEmployee(employee));
   } catch (error: any) {
     console.error('Get profile error:', error);
     console.error('Error stack:', error.stack);
@@ -149,13 +165,14 @@ export const createEmployee = async (
 
     res.status(201).json({
       message: "Employee created successfully",
-      employee: {
+      employee: serializeEmployee({
         employeeId: employee.employeeId,
         fullName: employee.fullName,
         username: employee.username,
         emailAddress: employee.emailAddress,
         assignedRole: employee.assignedRole,
-      }
+        joinedAt: employee.joinedAt,
+      })
     });
 
   } catch (error: any) {
@@ -180,7 +197,7 @@ export const getEmployees = async (
   try {
     const employees = await getEmployeesService();
 
-    res.json(employees);
+    res.json(serializeEmployees(employees));
   } catch (error) {
     console.error(error);
 
@@ -207,7 +224,7 @@ export const getEmployeeById = async (
       return;
     }
 
-    res.json(employee);
+    res.json(serializeEmployee(employee));
   } catch (error: any) {
     console.error('Error in getEmployeeById:', error);
     console.error('Error stack:', error.stack);
@@ -236,14 +253,16 @@ export const updateEmployee = async (
 
     res.json({
       message: "Employee updated successfully",
-      employee: {
+      employee: serializeEmployee({
         employeeId: employee.employeeId,
         fullName: employee.fullName,
         emailAddress: employee.emailAddress,
         assignedRole: employee.assignedRole,
         assignedDepartment: employee.assignedDepartment,
         isActive: employee.isActive,
-      }
+        joinedAt: employee.joinedAt,
+        last_login: employee.last_login,
+      })
     });
   } catch (error: any) {
     console.error('Update employee error:', error);

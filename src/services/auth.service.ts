@@ -25,6 +25,11 @@ export const loginService = async (
     throw new Error("Invalid username or password");
   }
   
+  // Update last_login with current epoch timestamp
+  await prisma.employee.update({
+    where: { employeeId: employee.employeeId },
+    data: { last_login: BigInt(Date.now()) },
+  });
 
  const token = jwt.sign(
   {
@@ -87,7 +92,7 @@ export const registerService = async (data: {
   // Hash password
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
-  // Create employee
+  // Create employee with epoch timestamp for joinedAt
   const employee = await prisma.employee.create({
     data: {
       fullName: data.fullName,
@@ -99,6 +104,7 @@ export const registerService = async (data: {
       baseSalary: data.baseSalary || 0,
       allowances: data.allowances || 0,
       deductions: data.deductions || 0,
+      joinedAt: BigInt(Date.now()),
     },
   });
 

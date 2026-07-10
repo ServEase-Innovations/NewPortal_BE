@@ -20,12 +20,12 @@ model Employee {
   deductions         Decimal        @default(0) @db.Decimal(12, 2)
 
   isActive           Boolean        @default(true) @map("is_active")
-  joinedAt           DateTime       @default(now()) @map("joined_at")
+  joinedAt           BigInt         @map("joined_at")
 
   managerId          String?        @map("manager_id")
   teamId             String?        @map("team_id")
 
-  last_login         DateTime?
+  last_login         BigInt?
   password           String
   refresh_token      String?
   username           String         @unique
@@ -44,9 +44,9 @@ model Team {
   teamName          String     @unique @map("team_name")
   projectTitle      String     @map("project_title")
   projectSummary    String?    @map("project_summary")
-  milestoneDeadline DateTime   @map("milestone_deadline")
-  createdAt         DateTime   @default(now()) @map("created_at")
-  updatedAt         DateTime   @updatedAt @map("updated_at")
+  milestoneDeadline BigInt     @map("milestone_deadline")
+  createdAt         BigInt     @map("created_at")
+  updatedAt         BigInt     @map("updated_at")
 
   employees         Employee[]
 
@@ -56,7 +56,7 @@ model Team {
 model Attendance {
   attendanceId       BigInt           @id @default(autoincrement()) @map("attendance_id")
   employeeId         String           @map("employee_id")
-  calendarDate       DateTime         @map("calendar_date") @db.Date
+  calendarDate       BigInt           @map("calendar_date")
   shiftStatus        AttendanceStatus @default(Working) @map("shift_status")
   clockInTimestamp   BigInt?          @map("clock_in_timestamp")
   clockOutTimestamp  BigInt?          @map("clock_out_timestamp")
