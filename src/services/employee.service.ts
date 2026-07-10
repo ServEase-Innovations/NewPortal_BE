@@ -31,7 +31,7 @@ export const getEmployeesService = async () => {
   });
 };
 
-export const getEmployeeByIdService = async (id: string) => {
+export const getEmployeeByIdService = async (id: bigint) => {
   return prisma.employee.findUnique({
     where: {
       employeeId: id,
@@ -57,7 +57,7 @@ export const getEmployeeByIdService = async (id: string) => {
 };
 
 export const updateEmployeeService = async (
-  id: string,
+  id: bigint,
   data: any
 ) => {
   return prisma.employee.update({
@@ -68,7 +68,7 @@ export const updateEmployeeService = async (
   });
 };
 
-export const deleteEmployeeService = async (id: string) => {
+export const deleteEmployeeService = async (id: bigint) => {
   return prisma.employee.delete({
     where: {
       employeeId: id,

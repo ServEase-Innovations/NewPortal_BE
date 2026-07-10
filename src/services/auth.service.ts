@@ -33,7 +33,7 @@ export const loginService = async (
 
  const token = jwt.sign(
   {
-    employeeId: employee.employeeId,
+    employeeId: employee.employeeId.toString(), // Convert BigInt to string for JWT
     username: employee.username,
     emailAddress: employee.emailAddress,
     assignedRole: employee.assignedRole,
@@ -47,7 +47,7 @@ export const loginService = async (
   return {
     token,
     employee: {
-      employeeId: employee.employeeId,
+      employeeId: employee.employeeId.toString(), // Convert BigInt to string
       fullName: employee.fullName,
       username: employee.username,
       emailAddress: employee.emailAddress,

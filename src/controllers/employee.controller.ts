@@ -20,6 +20,8 @@ const serializeEmployee = (employee: any) => {
   
   return {
     ...employee,
+    employeeId: employee.employeeId ? employee.employeeId.toString() : null,
+    managerId: employee.managerId ? employee.managerId.toString() : null,
     joinedAt: employee.joinedAt ? new Date(Number(employee.joinedAt)).toISOString() : null,
     last_login: employee.last_login ? new Date(Number(employee.last_login)).toISOString() : null,
   };
@@ -88,7 +90,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
     }
 
     const employee = await prisma.employee.findUnique({
-      where: { employeeId: req.employee.employeeId },
+      where: { employeeId: BigInt(req.employee.employeeId) },
       select: {
         employeeId: true,
         fullName: true,
@@ -214,7 +216,7 @@ export const getEmployeeById = async (
   try {
     console.log('Getting employee by ID:', req.params.id);
     const employee = await getEmployeeByIdService(
-      req.params.id
+      BigInt(req.params.id)
     );
 
     if (!employee) {
@@ -247,7 +249,7 @@ export const updateEmployee = async (
     }
 
     const employee = await updateEmployeeService(
-      req.params.id,
+      BigInt(req.params.id),
       req.body
     );
 
@@ -284,7 +286,7 @@ export const deleteEmployee = async (
   res: Response
 ) => {
   try {
-    await deleteEmployeeService(req.params.id);
+    await deleteEmployeeService(BigInt(req.params.id));
 
     res.json({
       message: "Employee deleted successfully",

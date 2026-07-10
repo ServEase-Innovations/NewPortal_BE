@@ -13,6 +13,7 @@ import { createAttendanceSchema, updateAttendanceSchema } from "../validations/a
 const serializeAttendance = (attendance: any) => ({
   ...attendance,
   attendanceId: attendance.attendanceId.toString(),
+  employeeId: attendance.employeeId ? attendance.employeeId.toString() : null,
   calendarDate: attendance.calendarDate 
     ? new Date(Number(attendance.calendarDate)).toISOString()
     : null,
@@ -22,6 +23,14 @@ const serializeAttendance = (attendance: any) => ({
   clockOutTimestamp: attendance.clockOutTimestamp
     ? new Date(Number(attendance.clockOutTimestamp)).toISOString()
     : null,
+  // Serialize nested employee if present
+  employee: attendance.employee ? {
+    ...attendance.employee,
+    employeeId: attendance.employee.employeeId.toString(),
+    managerId: attendance.employee.managerId ? attendance.employee.managerId.toString() : null,
+    joinedAt: attendance.employee.joinedAt ? new Date(Number(attendance.employee.joinedAt)).toISOString() : null,
+    last_login: attendance.employee.last_login ? new Date(Number(attendance.employee.last_login)).toISOString() : null,
+  } : undefined,
 });
 
 export const createAttendance = async (
@@ -39,6 +48,11 @@ export const createAttendance = async (
     }
 
     const data: any = { ...result.data };
+
+    // Convert employeeId string to BigInt
+    if (data.employeeId) {
+      data.employeeId = BigInt(data.employeeId);
+    }
 
     // Convert calendarDate to epoch milliseconds (BigInt)
     if (data.calendarDate) {

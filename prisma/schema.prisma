@@ -7,7 +7,7 @@ datasource db {
 }
 
 model Employee {
-  employeeId         String         @id @default(uuid()) @map("employee_id")
+  employeeId         BigInt         @id @default(autoincrement()) @map("employee_id")
   fullName           String         @map("full_name")
   emailAddress       String         @unique @map("email_address")
   assignedRole       EmployeeRole   @default(Developer) @map("assigned_role")
@@ -22,7 +22,7 @@ model Employee {
   isActive           Boolean        @default(true) @map("is_active")
   joinedAt           BigInt         @map("joined_at")
 
-  managerId          String?        @map("manager_id")
+  managerId          BigInt?        @map("manager_id")
   teamId             String?        @map("team_id")
 
   last_login         BigInt?
@@ -55,7 +55,7 @@ model Team {
 
 model Attendance {
   attendanceId       BigInt           @id @default(autoincrement()) @map("attendance_id")
-  employeeId         String           @map("employee_id")
+  employeeId         BigInt           @map("employee_id")
   calendarDate       BigInt           @map("calendar_date")
   shiftStatus        AttendanceStatus @default(Working) @map("shift_status")
   clockInTimestamp   BigInt?          @map("clock_in_timestamp")
