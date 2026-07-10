@@ -28,8 +28,13 @@ const serializeAttendance = (attendance: any) => ({
     ...attendance.employee,
     employeeId: attendance.employee.employeeId.toString(),
     managerId: attendance.employee.managerId ? attendance.employee.managerId.toString() : null,
+<<<<<<< HEAD
     joinedAt: attendance.employee.joinedAt ? Number(attendance.employee.joinedAt) : null,
     last_login: attendance.employee.last_login ? Number(attendance.employee.last_login) : null,
+=======
+    joinedAt: attendance.employee.joinedAt ? new Date(Number(attendance.employee.joinedAt)).toISOString() : null,
+    last_login: attendance.employee.last_login ? new Date(Number(attendance.employee.last_login)).toISOString() : null,
+>>>>>>> aec3bf3 (add daily task submission feature)
   } : undefined,
 });
 
@@ -52,6 +57,15 @@ export const createAttendance = async (
     // Convert employeeId string to BigInt
     if (data.employeeId) {
       data.employeeId = BigInt(data.employeeId);
+<<<<<<< HEAD
+=======
+    }
+
+    // Convert calendarDate to epoch milliseconds (BigInt)
+    if (data.calendarDate) {
+      const date = new Date(data.calendarDate);
+      data.calendarDate = BigInt(date.getTime());
+>>>>>>> aec3bf3 (add daily task submission feature)
     }
 
     // Convert epoch number to BigInt (already in milliseconds)

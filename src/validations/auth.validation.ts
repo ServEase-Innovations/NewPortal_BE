@@ -10,8 +10,8 @@ export const registerEmployeeSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
   emailAddress: z.string().email("Invalid email address"),
   assignedRole: z.nativeEnum(EmployeeRole, {
-    errorMap: () => ({ message: "Invalid role" }),
-  }),
+  error: "Invalid role",
+}),
   assignedDepartment: z.string().min(2, "Department must be at least 2 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(8, "Password must be at least 8 characters"),

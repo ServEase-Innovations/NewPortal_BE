@@ -57,13 +57,17 @@ const options: swaggerJsdoc.Options = {
         name: 'Attendance',
         description: 'Attendance tracking endpoints',
       },
+      {
+        name: 'Daily Tasks',
+        description: 'Date-based employee work reports, Jira links, and attachments',
+      },
     ],
   },
   // Use relative paths from project root
   apis: ['./src/routes/*.ts', './src/routes/*.js'],
 };
 
-const swaggerSpec = swaggerJsdoc(options);
+const swaggerSpec = swaggerJsdoc(options) as any;
 
 // Log to help debug
 const spec = swaggerSpec as any;

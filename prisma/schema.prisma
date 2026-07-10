@@ -15,40 +15,46 @@ model Employee {
   appraisalState     AppraisalState @default(Pristine) @map("appraisal_state")
   privateAdminNotes  String?        @map("private_admin_notes")
 
-  baseSalary         Decimal        @default(0) @map("base_salary") @db.Decimal(12, 2)
-  allowances         Decimal        @default(0) @db.Decimal(12, 2)
-  deductions         Decimal        @default(0) @db.Decimal(12, 2)
+  baseSalary Decimal @default(0) @map("base_salary") @db.Decimal(12, 2)
+  allowances Decimal @default(0) @db.Decimal(12, 2)
+  deductions Decimal @default(0) @db.Decimal(12, 2)
 
-  isActive           Boolean        @default(true) @map("is_active")
-  joinedAt           BigInt         @map("joined_at")
+  isActive Boolean @default(true) @map("is_active")
+  joinedAt BigInt  @map("joined_at")
 
+<<<<<<< HEAD
   managerId          BigInt?        @map("manager_id")
   teamId             String?        @map("team_id")
+=======
+  managerId BigInt? @map("manager_id")
+  teamId    String? @map("team_id")
+>>>>>>> aec3bf3 (add daily task submission feature)
 
-  last_login         BigInt?
-  password           String
-  refresh_token      String?
-  username           String         @unique
+  last_login    BigInt?
+  password      String
+  refresh_token String?
+  username      String  @unique
 
-  attendance         Attendance[]
+  attendance           Attendance[]
+  dailyTaskSubmissions DailyTaskSubmission[]
 
-  manager            Employee?      @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
-  subordinates       Employee[]     @relation("ManagerSubordinates")
-  team               Team?          @relation(fields: [teamId], references: [teamId])
+  manager      Employee?  @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
+  subordinates Employee[] @relation("ManagerSubordinates")
+  team         Team?      @relation(fields: [teamId], references: [teamId])
 
   @@map("employees")
 }
 
 model Team {
-  teamId            String     @id @default(cuid()) @map("team_id")
-  teamName          String     @unique @map("team_name")
-  projectTitle      String     @map("project_title")
-  projectSummary    String?    @map("project_summary")
-  milestoneDeadline BigInt     @map("milestone_deadline")
-  createdAt         BigInt     @map("created_at")
-  updatedAt         BigInt     @map("updated_at")
+  teamId            String  @id @default(cuid()) @map("team_id")
+  teamName          String  @unique @map("team_name")
+  projectTitle      String  @map("project_title")
+  projectSummary    String? @map("project_summary")
+  milestoneDeadline BigInt  @map("milestone_deadline")
+  createdAt         BigInt  @map("created_at")
+  updatedAt         BigInt  @map("updated_at")
 
-  employees         Employee[]
+  employees Employee[]
 
   @@map("teams")
 }
@@ -62,11 +68,61 @@ model Attendance {
   clockOutTimestamp  BigInt?          @map("clock_out_timestamp")
   totalHoursComputed Decimal          @default(8.00) @map("total_hours_computed") @db.Decimal(10, 2)
 
-  employee           Employee         @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
 
   @@unique([employeeId, calendarDate], name: "unique_employee_date_entry")
   @@index([employeeId, calendarDate], map: "idx_attendance_composite")
   @@map("attendance")
+}
+
+model DailyTaskSubmission {
+  dailyTaskSubmissionId BigInt          @id @default(autoincrement()) @map("daily_task_submission_id")
+  employeeId            BigInt          @map("employee_id")
+  workDescription       String          @map("work_description") @db.Text
+  status                DailyTaskStatus @default(Pending)
+  newIdeas              String?         @map("new_ideas") @db.Text
+  submissionDate        BigInt          @map("submission_date")
+  submittedAt           BigInt          @map("submitted_at")
+  updatedAt             BigInt          @map("updated_at")
+
+  employee    Employee              @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  jiraLinks   DailyTaskJiraLink[]
+  attachments DailyTaskAttachment[]
+
+  @@unique([employeeId, submissionDate], name: "unique_employee_daily_task")
+  @@index([submissionDate], map: "idx_daily_task_submission_date")
+  @@index([status, submissionDate], map: "idx_daily_task_status_date")
+  @@map("daily_task_submissions")
+}
+
+model DailyTaskJiraLink {
+  dailyTaskJiraLinkId   BigInt  @id @default(autoincrement()) @map("daily_task_jira_link_id")
+  dailyTaskSubmissionId BigInt  @map("daily_task_submission_id")
+  label                 String?
+  url                   String  @db.Text
+  createdAt             BigInt  @map("created_at")
+
+  dailyTaskSubmission DailyTaskSubmission @relation(fields: [dailyTaskSubmissionId], references: [dailyTaskSubmissionId], onDelete: Cascade)
+
+  @@index([dailyTaskSubmissionId], map: "idx_daily_task_jira_submission")
+  @@map("daily_task_jira_links")
+}
+
+model DailyTaskAttachment {
+  dailyTaskAttachmentId BigInt @id @default(autoincrement()) @map("daily_task_attachment_id")
+  dailyTaskSubmissionId BigInt @map("daily_task_submission_id")
+  fileName              String @map("file_name")
+  storedFileName        String @map("stored_file_name")
+  fileUrl               String @map("file_url") @db.Text
+  fileType              String @map("file_type")
+  mimeType              String @map("mime_type")
+  fileSize              BigInt @map("file_size")
+  uploadedAt            BigInt @map("uploaded_at")
+
+  dailyTaskSubmission DailyTaskSubmission @relation(fields: [dailyTaskSubmissionId], references: [dailyTaskSubmissionId], onDelete: Cascade)
+
+  @@index([dailyTaskSubmissionId], map: "idx_daily_task_attachment_submission")
+  @@map("daily_task_attachments")
 }
 
 enum EmployeeRole {
@@ -82,6 +138,11 @@ enum AttendanceStatus {
   Working
   OnLeave
   Absent
+}
+
+enum DailyTaskStatus {
+  Pending
+  Completed
 }
 
 enum AppraisalState {

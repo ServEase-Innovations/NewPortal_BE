@@ -3,12 +3,14 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import path from 'path';
 
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from "./routes/employee.routes";
 import swaggerSpec from "./swagger/swagger";
 import teamRoutes from "./routes/team.routes";
 import attendanceRoutes from "./routes/attendance.routes";
+import dailyTaskRoutes from "./routes/daily-task.routes";
 
 dotenv.config();
 
@@ -21,6 +23,8 @@ app.use(cors({
   origin: "*",
   credentials: true,
 }));
+
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 app.get('/', (req, res) => {
   res.send('Backend is running');
@@ -44,6 +48,7 @@ app.get('/api-docs.json', (req, res) => {
 app.use("/employees", employeeRoutes);
 app.use("/teams", teamRoutes);
 app.use("/attendance", attendanceRoutes);
+app.use("/daily-tasks", dailyTaskRoutes);
 app.use("/auth", authRoutes);
 
 app.listen(PORT, () => {
