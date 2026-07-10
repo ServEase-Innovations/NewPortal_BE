@@ -17,3 +17,17 @@ export const createAttendanceSchema = z.object({
 
   totalHoursComputed: z.number().min(0),
 });
+
+export const updateAttendanceSchema = z.object({
+  shiftStatus: z.enum([
+    "Working",
+    "OnLeave",
+    "Absent",
+  ]).optional(),
+
+  clockInTimestamp: z.string().optional(),
+
+  clockOutTimestamp: z.string().optional(),
+
+  totalHoursComputed: z.number().min(0).optional(),
+});
