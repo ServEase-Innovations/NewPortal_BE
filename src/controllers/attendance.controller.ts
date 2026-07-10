@@ -121,26 +121,49 @@ export const updateAttendance = async (
         });
       }
 
+      // Helper function to parse time from various formats
+      const parseTime = (timeString: string | Date | null): Date | null => {
+        if (!timeString) return null;
+        
+        const date = new Date(timeString);
+        
+        // Create a date object with today's date but the time from the input
+        // This ensures we're comparing times on the same day
+        const today = new Date();
+        return new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate(),
+          date.getHours(),
+          date.getMinutes(),
+          date.getSeconds(),
+          date.getMilliseconds()
+        );
+      };
+
       // Determine clock-in and clock-out times
       const clockInTime = updateData.clockInTimestamp 
-        ? new Date(updateData.clockInTimestamp)
-        : existingAttendance.clockInTimestamp 
-          ? new Date(existingAttendance.clockInTimestamp)
-          : null;
+        ? parseTime(updateData.clockInTimestamp)
+        : parseTime(existingAttendance.clockInTimestamp);
 
       const clockOutTime = updateData.clockOutTimestamp
-        ? new Date(updateData.clockOutTimestamp)
-        : existingAttendance.clockOutTimestamp
-          ? new Date(existingAttendance.clockOutTimestamp)
-          : null;
+        ? parseTime(updateData.clockOutTimestamp)
+        : parseTime(existingAttendance.clockOutTimestamp);
 
       // Calculate hours if both timestamps are available
       if (clockInTime && clockOutTime) {
-        const diffInMs = clockOutTime.getTime() - clockInTime.getTime();
+        let diffInMs = clockOutTime.getTime() - clockInTime.getTime();
+        
+        // If clock out is "earlier" than clock in, assume it's the next day
+        if (diffInMs < 0) {
+          diffInMs += 24 * 60 * 60 * 1000; // Add 24 hours
+        }
+        
         const diffInHours = diffInMs / (1000 * 60 * 60);
         
-        // Round to 2 decimal places and ensure it's positive
-        updateData.totalHoursComputed = Math.max(0, Math.round(diffInHours * 100) / 100);
+        // Round to 2 decimal places and cap at 99.99 (database limit)
+        const calculatedHours = Math.min(99.99, Math.max(0, Math.round(diffInHours * 100) / 100));
+        updateData.totalHoursComputed = calculatedHours;
       }
     }
 
