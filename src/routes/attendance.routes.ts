@@ -26,7 +26,9 @@ const router = Router();
  *             type: object
  *             properties:
  *               employeeId:
- *                 type: string
+ *                 type: integer
+ *                 description: Numeric employee ID
+ *                 example: 1
  *               calendarDate:
  *                 type: string
  *                 format: date

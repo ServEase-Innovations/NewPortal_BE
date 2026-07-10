@@ -161,7 +161,9 @@ router.get('/profile', authenticate, getProfile);
  *                   type: object
  *                   properties:
  *                     employeeId:
- *                       type: string
+ *                       type: integer
+ *                       description: Auto-incremented numeric employee ID
+ *                       example: 1
  *                     fullName:
  *                       type: string
  *                     username:
@@ -237,7 +239,9 @@ router.post(
  *                     type: object
  *                     properties:
  *                       employeeId:
- *                         type: string
+ *                         type: integer
+ *                         description: Auto-incremented numeric employee ID
+ *                         example: 1
  *                       fullName:
  *                         type: string
  *                       emailAddress:
@@ -289,7 +293,8 @@ router.get(
  *         required: true
  *         description: Employee ID
  *         schema:
- *           type: string
+ *           type: integer
+ *           example: 1
  *     responses:
  *       200:
  *         description: Employee found successfully
@@ -299,7 +304,9 @@ router.get(
  *               type: object
  *               properties:
  *                 employeeId:
- *                   type: string
+ *                   type: integer
+ *                   description: Auto-incremented numeric employee ID
+ *                   example: 1
  *                 fullName:
  *                   type: string
  *                 emailAddress:
@@ -325,7 +332,9 @@ router.get(
  *                   type: string
  *                   format: date-time
  *                 managerId:
- *                   type: string
+ *                   type: integer
+ *                   description: Manager's employee ID
+ *                   example: 5
  *                 teamId:
  *                   type: string
  *       401:
@@ -360,7 +369,8 @@ router.get(
  *         required: true
  *         description: Employee ID
  *         schema:
- *           type: string
+ *           type: integer
+ *           example: 1
  *     requestBody:
  *       required: true
  *       content:
@@ -394,8 +404,9 @@ router.get(
  *                 type: boolean
  *                 example: true
  *               managerId:
- *                 type: string
- *                 description: ID of the manager
+ *                 type: integer
+ *                 description: ID of the manager (numeric employee ID)
+ *                 example: 5
  *               teamId:
  *                 type: string
  *                 description: ID of the team
@@ -413,7 +424,9 @@ router.get(
  *                   type: object
  *                   properties:
  *                     employeeId:
- *                       type: string
+ *                       type: integer
+ *                       description: Auto-incremented numeric employee ID
+ *                       example: 1
  *                     fullName:
  *                       type: string
  *                     emailAddress:
@@ -458,7 +471,8 @@ router.put(
  *         required: true
  *         description: Employee ID
  *         schema:
- *           type: string
+ *           type: integer
+ *           example: 1
  *     responses:
  *       200:
  *         description: Employee deleted successfully
