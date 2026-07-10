@@ -9,27 +9,27 @@ import {
 
 import { createAttendanceSchema, updateAttendanceSchema } from "../validations/attendance.validation";
 
-// Serialization helper to convert BigInt timestamps to ISO strings
+// Serialization helper to convert BigInt to number (epoch milliseconds)
 const serializeAttendance = (attendance: any) => ({
   ...attendance,
   attendanceId: attendance.attendanceId.toString(),
   employeeId: attendance.employeeId ? attendance.employeeId.toString() : null,
   calendarDate: attendance.calendarDate 
-    ? new Date(Number(attendance.calendarDate)).toISOString()
+    ? Number(attendance.calendarDate)
     : null,
   clockInTimestamp: attendance.clockInTimestamp 
-    ? new Date(Number(attendance.clockInTimestamp)).toISOString()
+    ? Number(attendance.clockInTimestamp)
     : null,
   clockOutTimestamp: attendance.clockOutTimestamp
-    ? new Date(Number(attendance.clockOutTimestamp)).toISOString()
+    ? Number(attendance.clockOutTimestamp)
     : null,
   // Serialize nested employee if present
   employee: attendance.employee ? {
     ...attendance.employee,
     employeeId: attendance.employee.employeeId.toString(),
     managerId: attendance.employee.managerId ? attendance.employee.managerId.toString() : null,
-    joinedAt: attendance.employee.joinedAt ? new Date(Number(attendance.employee.joinedAt)).toISOString() : null,
-    last_login: attendance.employee.last_login ? new Date(Number(attendance.employee.last_login)).toISOString() : null,
+    joinedAt: attendance.employee.joinedAt ? Number(attendance.employee.joinedAt) : null,
+    last_login: attendance.employee.last_login ? Number(attendance.employee.last_login) : null,
   } : undefined,
 });
 
@@ -54,21 +54,18 @@ export const createAttendance = async (
       data.employeeId = BigInt(data.employeeId);
     }
 
-    // Convert calendarDate to epoch milliseconds (BigInt)
+    // Convert epoch number to BigInt (already in milliseconds)
     if (data.calendarDate) {
-      const date = new Date(data.calendarDate);
-      data.calendarDate = BigInt(date.getTime());
+      data.calendarDate = BigInt(data.calendarDate);
     }
 
-    // Convert ISO timestamp strings to epoch milliseconds (BigInt)
+    // Convert epoch numbers to BigInt
     if (data.clockInTimestamp) {
-      const date = new Date(data.clockInTimestamp);
-      data.clockInTimestamp = BigInt(date.getTime());
+      data.clockInTimestamp = BigInt(data.clockInTimestamp);
     }
 
     if (data.clockOutTimestamp) {
-      const date = new Date(data.clockOutTimestamp);
-      data.clockOutTimestamp = BigInt(date.getTime());
+      data.clockOutTimestamp = BigInt(data.clockOutTimestamp);
     }
 
     const attendance = await createAttendanceService(data);
@@ -151,15 +148,13 @@ export const updateAttendance = async (
 
     const updateData: any = { ...result.data };
 
-    // Convert ISO timestamp strings to epoch milliseconds (BigInt)
+    // Convert epoch numbers to BigInt
     if (updateData.clockInTimestamp) {
-      const date = new Date(updateData.clockInTimestamp);
-      updateData.clockInTimestamp = BigInt(date.getTime());
+      updateData.clockInTimestamp = BigInt(updateData.clockInTimestamp);
     }
 
     if (updateData.clockOutTimestamp) {
-      const date = new Date(updateData.clockOutTimestamp);
-      updateData.clockOutTimestamp = BigInt(date.getTime());
+      updateData.clockOutTimestamp = BigInt(updateData.clockOutTimestamp);
     }
 
     // Auto-calculate totalHoursComputed if timestamps are involved

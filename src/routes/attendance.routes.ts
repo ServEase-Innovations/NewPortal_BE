@@ -30,10 +30,9 @@ const router = Router();
  *                 description: Numeric employee ID
  *                 example: 1
  *               calendarDate:
- *                 type: string
- *                 format: date
- *                 description: Attendance date (stored as epoch, sent/received as ISO 8601)
- *                 example: "2026-07-10T00:00:00.000Z"
+ *                 type: integer
+ *                 description: Attendance date as epoch milliseconds
+ *                 example: 1783728000000
  *               shiftStatus:
  *                 type: string
  *                 enum:
@@ -41,15 +40,13 @@ const router = Router();
  *                   - OnLeave
  *                   - Absent
  *               clockInTimestamp:
- *                 type: string
- *                 format: date-time
- *                 description: Clock-in time (stored as epoch, sent/received as ISO 8601)
- *                 example: "2026-07-10T09:00:00.000Z"
+ *                 type: integer
+ *                 description: Clock-in time as epoch milliseconds
+ *                 example: 1783760400000
  *               clockOutTimestamp:
- *                 type: string
- *                 format: date-time
- *                 description: Clock-out time (stored as epoch, sent/received as ISO 8601)
- *                 example: "2026-07-10T17:30:00.000Z"
+ *                 type: integer
+ *                 description: Clock-out time as epoch milliseconds
+ *                 example: 1783791000000
  *               totalHoursComputed:
  *                 type: number
  *     responses:

@@ -3,7 +3,7 @@ import { z } from "zod";
 export const createAttendanceSchema = z.object({
   employeeId: z.string().min(1, "Employee ID is required"),
 
-  calendarDate: z.iso.datetime(),
+  calendarDate: z.number().int().positive(),
 
   shiftStatus: z.enum([
     "Working",
@@ -11,9 +11,9 @@ export const createAttendanceSchema = z.object({
     "Absent",
   ]),
 
-  clockInTimestamp: z.iso.datetime().optional(),
+  clockInTimestamp: z.number().int().positive().optional(),
 
-  clockOutTimestamp: z.iso.datetime().optional(),
+  clockOutTimestamp: z.number().int().positive().optional(),
 
   totalHoursComputed: z.number().min(0),
 });
@@ -25,9 +25,9 @@ export const updateAttendanceSchema = z.object({
     "Absent",
   ]).optional(),
 
-  clockInTimestamp: z.string().optional(),
+  clockInTimestamp: z.number().int().positive().optional(),
 
-  clockOutTimestamp: z.string().optional(),
+  clockOutTimestamp: z.number().int().positive().optional(),
 
   totalHoursComputed: z.number().min(0).optional(),
 });
