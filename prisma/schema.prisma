@@ -58,9 +58,9 @@ model Attendance {
   employeeId         String           @map("employee_id")
   calendarDate       DateTime         @map("calendar_date") @db.Date
   shiftStatus        AttendanceStatus @default(Working) @map("shift_status")
-  clockInTimestamp   DateTime?        @map("clock_in_timestamp") @db.Time(6)
-  clockOutTimestamp  DateTime?        @map("clock_out_timestamp") @db.Time(6)
-  totalHoursComputed Decimal          @default(8.00) @map("total_hours_computed") @db.Decimal(4, 2)
+  clockInTimestamp   BigInt?          @map("clock_in_timestamp")
+  clockOutTimestamp  BigInt?          @map("clock_out_timestamp")
+  totalHoursComputed Decimal          @default(8.00) @map("total_hours_computed") @db.Decimal(10, 2)
 
   employee           Employee         @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
 

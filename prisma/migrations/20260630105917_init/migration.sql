@@ -6,5 +6,5 @@
 */
 -- AlterTable
 ALTER TABLE "attendance" DROP CONSTRAINT "attendance_pkey",
-ALTER COLUMN "attendance_id" SET DATA TYPE BIGSERIAL,
+ALTER COLUMN "attendance_id" SET DATA TYPE BIGINT,
 ADD CONSTRAINT "attendance_pkey" PRIMARY KEY ("attendance_id");

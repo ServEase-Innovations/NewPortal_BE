@@ -12,6 +12,12 @@ import { createAttendanceSchema, updateAttendanceSchema } from "../validations/a
 const serializeAttendance = (attendance: any) => ({
   ...attendance,
   attendanceId: attendance.attendanceId.toString(),
+  clockInTimestamp: attendance.clockInTimestamp 
+    ? new Date(Number(attendance.clockInTimestamp)).toISOString()
+    : null,
+  clockOutTimestamp: attendance.clockOutTimestamp
+    ? new Date(Number(attendance.clockOutTimestamp)).toISOString()
+    : null,
 });
 
 export const createAttendance = async (
@@ -28,7 +34,20 @@ export const createAttendance = async (
       });
     }
 
-    const attendance = await createAttendanceService(result.data);
+    const data: any = { ...result.data };
+
+    // Convert ISO timestamp strings to epoch milliseconds (BigInt)
+    if (data.clockInTimestamp) {
+      const date = new Date(data.clockInTimestamp);
+      data.clockInTimestamp = BigInt(date.getTime());
+    }
+
+    if (data.clockOutTimestamp) {
+      const date = new Date(data.clockOutTimestamp);
+      data.clockOutTimestamp = BigInt(date.getTime());
+    }
+
+    const attendance = await createAttendanceService(data);
 
     res.status(201).json(
       serializeAttendance(attendance)
@@ -108,6 +127,17 @@ export const updateAttendance = async (
 
     const updateData: any = { ...result.data };
 
+    // Convert ISO timestamp strings to epoch milliseconds (BigInt)
+    if (updateData.clockInTimestamp) {
+      const date = new Date(updateData.clockInTimestamp);
+      updateData.clockInTimestamp = BigInt(date.getTime());
+    }
+
+    if (updateData.clockOutTimestamp) {
+      const date = new Date(updateData.clockOutTimestamp);
+      updateData.clockOutTimestamp = BigInt(date.getTime());
+    }
+
     // Auto-calculate totalHoursComputed if timestamps are involved
     if (updateData.clockInTimestamp || updateData.clockOutTimestamp) {
       // Fetch existing record to get the other timestamp if only one is provided
@@ -121,48 +151,21 @@ export const updateAttendance = async (
         });
       }
 
-      // Helper function to parse time from various formats
-      const parseTime = (timeString: string | Date | null): Date | null => {
-        if (!timeString) return null;
-        
-        const date = new Date(timeString);
-        
-        // Create a date object with today's date but the time from the input
-        // This ensures we're comparing times on the same day
-        const today = new Date();
-        return new Date(
-          today.getFullYear(),
-          today.getMonth(),
-          today.getDate(),
-          date.getHours(),
-          date.getMinutes(),
-          date.getSeconds(),
-          date.getMilliseconds()
-        );
-      };
-
-      // Determine clock-in and clock-out times
-      const clockInTime = updateData.clockInTimestamp 
-        ? parseTime(updateData.clockInTimestamp)
-        : parseTime(existingAttendance.clockInTimestamp);
-
-      const clockOutTime = updateData.clockOutTimestamp
-        ? parseTime(updateData.clockOutTimestamp)
-        : parseTime(existingAttendance.clockOutTimestamp);
+      // Get clock-in and clock-out epoch times
+      const clockInEpoch = updateData.clockInTimestamp || existingAttendance.clockInTimestamp;
+      const clockOutEpoch = updateData.clockOutTimestamp || existingAttendance.clockOutTimestamp;
 
       // Calculate hours if both timestamps are available
-      if (clockInTime && clockOutTime) {
-        let diffInMs = clockOutTime.getTime() - clockInTime.getTime();
+      if (clockInEpoch && clockOutEpoch) {
+        // Convert BigInt to number for calculation
+        const clockInMs = Number(clockInEpoch);
+        const clockOutMs = Number(clockOutEpoch);
         
-        // If clock out is "earlier" than clock in, assume it's the next day
-        if (diffInMs < 0) {
-          diffInMs += 24 * 60 * 60 * 1000; // Add 24 hours
-        }
-        
+        const diffInMs = clockOutMs - clockInMs;
         const diffInHours = diffInMs / (1000 * 60 * 60);
         
-        // Round to 2 decimal places and cap at 99.99 (database limit)
-        const calculatedHours = Math.min(99.99, Math.max(0, Math.round(diffInHours * 100) / 100));
+        // Round to 2 decimal places and ensure it's within reasonable bounds
+        const calculatedHours = Math.max(0, Math.min(999.99, Math.round(diffInHours * 100) / 100));
         updateData.totalHoursComputed = calculatedHours;
       }
     }
