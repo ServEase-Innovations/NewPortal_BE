@@ -257,6 +257,8 @@ router.post(
  *                       joinedAt:
  *                         type: string
  *                         format: date-time
+ *                         description: Employee join date (stored as epoch, returned as ISO 8601)
+ *                         example: "2026-01-15T10:30:00.000Z"
  *                 total:
  *                   type: integer
  *                 page:
@@ -328,9 +330,13 @@ router.get(
  *                 joinedAt:
  *                   type: string
  *                   format: date-time
+ *                   description: Employee join date (stored as epoch, returned as ISO 8601)
+ *                   example: "2026-01-15T10:30:00.000Z"
  *                 lastLogin:
  *                   type: string
  *                   format: date-time
+ *                   description: Last login timestamp (stored as epoch, returned as ISO 8601)
+ *                   example: "2026-07-10T14:30:00.000Z"
  *                 managerId:
  *                   type: integer
  *                   description: Manager's employee ID

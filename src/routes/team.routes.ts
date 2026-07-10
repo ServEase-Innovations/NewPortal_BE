@@ -37,6 +37,7 @@ const router = Router();
  *               milestoneDeadline:
  *                 type: string
  *                 format: date-time
+ *                 description: Project milestone deadline (stored as epoch, sent/received as ISO 8601)
  *                 example: 2026-12-31T00:00:00.000Z
  *     responses:
  *       201:
@@ -115,6 +116,7 @@ router.get("/:id", getTeamById);
  *               milestoneDeadline:
  *                 type: string
  *                 format: date-time
+ *                 description: Project milestone deadline (stored as epoch, sent/received as ISO 8601)
  *                 example: 2027-01-31T00:00:00.000Z
  *     responses:
  *       200:

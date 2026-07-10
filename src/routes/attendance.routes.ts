@@ -32,6 +32,8 @@ const router = Router();
  *               calendarDate:
  *                 type: string
  *                 format: date
+ *                 description: Attendance date (stored as epoch, sent/received as ISO 8601)
+ *                 example: "2026-07-10T00:00:00.000Z"
  *               shiftStatus:
  *                 type: string
  *                 enum:
@@ -41,9 +43,13 @@ const router = Router();
  *               clockInTimestamp:
  *                 type: string
  *                 format: date-time
+ *                 description: Clock-in time (stored as epoch, sent/received as ISO 8601)
+ *                 example: "2026-07-10T09:00:00.000Z"
  *               clockOutTimestamp:
  *                 type: string
  *                 format: date-time
+ *                 description: Clock-out time (stored as epoch, sent/received as ISO 8601)
+ *                 example: "2026-07-10T17:30:00.000Z"
  *               totalHoursComputed:
  *                 type: number
  *     responses:

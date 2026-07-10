@@ -8,7 +8,12 @@ const options: swaggerJsdoc.Options = {
     info: {
       title: 'Employee Management API',
       version: '1.0.0',
-      description: 'Employee Management System with HR Role Support',
+      description: `Employee Management System with HR Role Support
+      
+**Important Notes:**
+- **Employee IDs**: Auto-incremented integers (1, 2, 3...) returned as strings in JSON
+- **Timestamps**: All date/time fields are stored internally as epoch milliseconds (BigInt) but are automatically converted to/from ISO 8601 format in API requests and responses
+- **Date Format**: Use ISO 8601 format for all date/time fields (e.g., "2026-07-10T14:30:00.000Z")`,
       contact: {
         name: 'API Support',
         email: 'support@company.com',
@@ -61,8 +66,9 @@ const options: swaggerJsdoc.Options = {
 const swaggerSpec = swaggerJsdoc(options);
 
 // Log to help debug
-console.log('Swagger API paths found:', Object.keys(swaggerSpec.paths || {}).length);
-if (Object.keys(swaggerSpec.paths || {}).length === 0) {
+const spec = swaggerSpec as any;
+console.log('Swagger API paths found:', Object.keys(spec.paths || {}).length);
+if (Object.keys(spec.paths || {}).length === 0) {
   console.warn('⚠️  No API paths found! Check route files have @swagger comments');
 }
 
