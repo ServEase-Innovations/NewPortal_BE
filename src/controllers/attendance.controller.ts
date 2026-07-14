@@ -52,15 +52,6 @@ export const createAttendance = async (
     // Convert employeeId string to BigInt
     if (data.employeeId) {
       data.employeeId = BigInt(data.employeeId);
-<<<<<<< HEAD
-=======
-    }
-
-    // Convert calendarDate to epoch milliseconds (BigInt)
-    if (data.calendarDate) {
-      const date = new Date(data.calendarDate);
-      data.calendarDate = BigInt(date.getTime());
->>>>>>> aec3bf3 (add daily task submission feature)
     }
 
     // Convert epoch number to BigInt (already in milliseconds)
