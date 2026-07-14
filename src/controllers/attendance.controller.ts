@@ -28,13 +28,8 @@ const serializeAttendance = (attendance: any) => ({
     ...attendance.employee,
     employeeId: attendance.employee.employeeId.toString(),
     managerId: attendance.employee.managerId ? attendance.employee.managerId.toString() : null,
-<<<<<<< HEAD
     joinedAt: attendance.employee.joinedAt ? Number(attendance.employee.joinedAt) : null,
     last_login: attendance.employee.last_login ? Number(attendance.employee.last_login) : null,
-=======
-    joinedAt: attendance.employee.joinedAt ? new Date(Number(attendance.employee.joinedAt)).toISOString() : null,
-    last_login: attendance.employee.last_login ? new Date(Number(attendance.employee.last_login)).toISOString() : null,
->>>>>>> aec3bf3 (add daily task submission feature)
   } : undefined,
 });
 
