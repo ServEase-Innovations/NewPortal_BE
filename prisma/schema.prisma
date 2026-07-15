@@ -22,13 +22,8 @@ model Employee {
   isActive Boolean @default(true) @map("is_active")
   joinedAt BigInt  @map("joined_at")
 
-<<<<<<< HEAD
   managerId          BigInt?        @map("manager_id")
   teamId             String?        @map("team_id")
-=======
-  managerId BigInt? @map("manager_id")
-  teamId    String? @map("team_id")
->>>>>>> aec3bf3 (add daily task submission feature)
 
   last_login    BigInt?
   password      String
