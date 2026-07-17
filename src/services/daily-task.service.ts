@@ -1,4 +1,8 @@
-import { DailyTaskStatus, Prisma } from "@prisma/client";
+import {
+  DailyTaskStatus,
+  Prisma,
+} from "@prisma/client";
+
 import prisma from "../prisma";
 
 const dailyTaskInclude = {
@@ -13,11 +17,17 @@ const dailyTaskInclude = {
       teamId: true,
     },
   },
+
   jiraLinks: {
-    orderBy: { createdAt: "asc" as const },
+    orderBy: {
+      createdAt: "asc" as const,
+    },
   },
+
   attachments: {
-    orderBy: { uploadedAt: "asc" as const },
+    orderBy: {
+      uploadedAt: "asc" as const,
+    },
   },
 } satisfies Prisma.DailyTaskSubmissionInclude;
 
@@ -60,107 +70,224 @@ export interface AttachmentInput {
   uploadedAt: bigint;
 }
 
-export const createDailyTaskService = (data: CreateDailyTaskInput) =>
-  prisma.dailyTaskSubmission.create({
+export const createDailyTaskService = (
+  data: CreateDailyTaskInput
+) => {
+  return prisma.dailyTaskSubmission.create({
     data: {
       employeeId: data.employeeId,
-      workDescription: data.workDescription,
+
+      workDescription:
+        data.workDescription.trim(),
+
       status: data.status,
-      newIdeas: data.newIdeas || null,
+
+      newIdeas:
+        data.newIdeas?.trim() || null,
+
+      /*
+       * Normalized date epoch, such as:
+       * 2026-07-09 00:00:00 UTC
+       */
       submissionDate: data.submissionDate,
+
+      /*
+       * Exact submission time.
+       */
       submittedAt: data.submittedAt,
       updatedAt: data.submittedAt,
-      jiraLinks: data.jiraLinks.length
-        ? {
-            create: data.jiraLinks.map((link) => ({
-              label: link.label,
-              url: link.url,
-              createdAt: data.submittedAt,
-            })),
-          }
-        : undefined,
+
+      jiraLinks:
+        data.jiraLinks.length > 0
+          ? {
+              create: data.jiraLinks.map(
+                (link) => ({
+                  label:
+                    link.label?.trim() || null,
+                  url: link.url.trim(),
+                  createdAt:
+                    data.submittedAt,
+                })
+              ),
+            }
+          : undefined,
     },
+
     include: dailyTaskInclude,
   });
+};
 
-export const getDailyTasksService = (filters: DailyTaskFilters) =>
-  prisma.dailyTaskSubmission.findMany({
+export const getDailyTasksService = (
+  filters: DailyTaskFilters
+) => {
+  const where: Prisma.DailyTaskSubmissionWhereInput =
+    {
+      submissionDate:
+        filters.submissionDate,
+    };
+
+  if (filters.employeeId !== undefined) {
+    where.employeeId = filters.employeeId;
+  }
+
+  if (filters.status !== undefined) {
+    where.status = filters.status;
+  }
+
+  return prisma.dailyTaskSubmission.findMany({
+    where,
+
+    include: dailyTaskInclude,
+
+    orderBy: [
+      {
+        submittedAt: "desc",
+      },
+      {
+        dailyTaskSubmissionId: "desc",
+      },
+    ],
+  });
+};
+
+export const getDailyTaskByIdService = (
+  id: bigint
+) => {
+  return prisma.dailyTaskSubmission.findUnique({
     where: {
-      submissionDate: filters.submissionDate,
-      employeeId: filters.employeeId,
-      status: filters.status,
+      dailyTaskSubmissionId: id,
     },
-    include: dailyTaskInclude,
-    orderBy: [{ submittedAt: "desc" }, { dailyTaskSubmissionId: "desc" }],
-  });
 
-export const getDailyTaskByIdService = (id: bigint) =>
-  prisma.dailyTaskSubmission.findUnique({
-    where: { dailyTaskSubmissionId: id },
     include: dailyTaskInclude,
   });
+};
 
 export const updateDailyTaskService = async (
   id: bigint,
   data: UpdateDailyTaskInput
 ) => {
-  await prisma.$transaction(async (transaction) => {
-    await transaction.dailyTaskSubmission.update({
-      where: { dailyTaskSubmissionId: id },
-      data: {
-        workDescription: data.workDescription,
-        status: data.status,
-        newIdeas: data.newIdeas,
-        updatedAt: data.updatedAt,
-      },
-    });
+  await prisma.$transaction(
+    async (transaction) => {
+      await transaction.dailyTaskSubmission.update({
+        where: {
+          dailyTaskSubmissionId: id,
+        },
 
-    if (data.jiraLinks !== undefined) {
-      await transaction.dailyTaskJiraLink.deleteMany({
-        where: { dailyTaskSubmissionId: id },
+        data: {
+          workDescription:
+            data.workDescription !== undefined
+              ? data.workDescription.trim()
+              : undefined,
+
+          status: data.status,
+
+          newIdeas:
+            data.newIdeas === undefined
+              ? undefined
+              : data.newIdeas?.trim() || null,
+
+          updatedAt: data.updatedAt,
+        },
       });
 
-      if (data.jiraLinks.length) {
-        await transaction.dailyTaskJiraLink.createMany({
-          data: data.jiraLinks.map((link) => ({
-            dailyTaskSubmissionId: id,
-            label: link.label,
-            url: link.url,
-            createdAt: data.updatedAt,
-          })),
-        });
+      if (data.jiraLinks !== undefined) {
+        await transaction.dailyTaskJiraLink.deleteMany(
+          {
+            where: {
+              dailyTaskSubmissionId: id,
+            },
+          }
+        );
+
+        if (data.jiraLinks.length > 0) {
+          await transaction.dailyTaskJiraLink.createMany(
+            {
+              data: data.jiraLinks.map(
+                (link) => ({
+                  dailyTaskSubmissionId: id,
+                  label:
+                    link.label?.trim() || null,
+                  url: link.url.trim(),
+                  createdAt: data.updatedAt,
+                })
+              ),
+            }
+          );
+        }
       }
     }
-  });
+  );
 
   return getDailyTaskByIdService(id);
 };
 
-export const addDailyTaskAttachmentsService = async (
-  dailyTaskSubmissionId: bigint,
-  attachments: AttachmentInput[]
-) => {
-  await prisma.dailyTaskAttachment.createMany({
-    data: attachments.map((attachment) => ({
-      dailyTaskSubmissionId,
-      ...attachment,
-    })),
-  });
+export const addDailyTaskAttachmentsService =
+  async (
+    dailyTaskSubmissionId: bigint,
+    attachments: AttachmentInput[]
+  ) => {
+    if (attachments.length === 0) {
+      return getDailyTaskByIdService(
+        dailyTaskSubmissionId
+      );
+    }
 
-  return getDailyTaskByIdService(dailyTaskSubmissionId);
-};
+    await prisma.dailyTaskAttachment.createMany({
+      data: attachments.map(
+        (attachment) => ({
+          dailyTaskSubmissionId,
 
-export const getDailyTaskAttachmentByIdService = (id: bigint) =>
-  prisma.dailyTaskAttachment.findUnique({
-    where: { dailyTaskAttachmentId: id },
-    include: {
-      dailyTaskSubmission: {
-        select: { employeeId: true },
+          fileName:
+            attachment.fileName,
+
+          storedFileName:
+            attachment.storedFileName,
+
+          fileUrl:
+            attachment.fileUrl,
+
+          fileType:
+            attachment.fileType,
+
+          mimeType:
+            attachment.mimeType,
+
+          fileSize:
+            attachment.fileSize,
+
+          uploadedAt:
+            attachment.uploadedAt,
+        })
+      ),
+    });
+
+    return getDailyTaskByIdService(
+      dailyTaskSubmissionId
+    );
+  };
+
+export const getDailyTaskAttachmentByIdService =
+  (id: bigint) => {
+    return prisma.dailyTaskAttachment.findUnique({
+      where: {
+        dailyTaskAttachmentId: id,
       },
-    },
-  });
 
-export const deleteDailyTaskAttachmentService = (id: bigint) =>
-  prisma.dailyTaskAttachment.delete({
-    where: { dailyTaskAttachmentId: id },
-  });
+      include: {
+        dailyTaskSubmission: {
+          select: {
+            employeeId: true,
+          },
+        },
+      },
+    });
+  };
+
+export const deleteDailyTaskAttachmentService =
+  (id: bigint) => {
+    return prisma.dailyTaskAttachment.delete({
+      where: {
+        dailyTaskAttachmentId: id,
+      },
+    });
+  };
