@@ -11,6 +11,8 @@ import swaggerSpec from "./swagger/swagger";
 import teamRoutes from "./routes/team.routes";
 import attendanceRoutes from "./routes/attendance.routes";
 import dailyTaskRoutes from "./routes/daily-task.routes";
+import payrollRunRoutes from "./routes/payroll-run.routes";
+import payslipRoutes from "./routes/payslip.routes";
 
 dotenv.config();
 
@@ -49,6 +51,8 @@ app.use("/employees", employeeRoutes);
 app.use("/teams", teamRoutes);
 app.use("/attendance", attendanceRoutes);
 app.use("/daily-tasks", dailyTaskRoutes);
+app.use("/payroll-runs", payrollRunRoutes);
+app.use("/payslips", payslipRoutes);
 app.use("/auth", authRoutes);
 
 app.listen(PORT, () => {

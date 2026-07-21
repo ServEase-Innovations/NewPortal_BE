@@ -1,8 +1,8 @@
 # NewPortal_BE
 
 Employee management backend built with Express, TypeScript, Prisma, and
-PostgreSQL. The existing Employee, Team, and Attendance APIs remain available,
-with an additive Daily Task Submission feature.
+PostgreSQL. The existing Employee, Team, Attendance, and Daily Task APIs remain
+available, with an additive payroll and payslip module.
 
 ## Setup
 
@@ -60,3 +60,27 @@ Example report body:
 
 Interactive API documentation is available at
 `http://localhost:5001/api-docs` while the server is running.
+
+## Payroll and Payslips
+
+SuperAdmin and HR users can create a monthly payroll run, generate draft
+payslips from active employee salary and attendance snapshots, adjust draft
+line items, approve the run, and mark it paid. Approval locks the financial
+snapshot so later employee salary edits do not alter historical payslips.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/payroll-runs` | Create a monthly payroll run |
+| `POST` | `/payroll-runs/:id/generate` | Generate missing draft payslips |
+| `PATCH` | `/payroll-runs/:id/approve` | Approve and lock all payslips |
+| `PATCH` | `/payroll-runs/:id/mark-paid` | Record payment status and reference |
+| `GET` | `/payslips` | HR/SuperAdmin payslip filters |
+| `PATCH` | `/payslips/:id` | Adjust a draft payslip and recalculate totals |
+| `GET` | `/payslips/mine` | Employee self-service payslip list |
+| `GET` | `/payslips/:id/pdf` | Download an authorized payslip PDF |
+
+Payroll generation treats Monday through Friday as working days. Attendance
+records marked `Absent` create an unpaid-leave deduction; `Working` and
+`OnLeave` do not reduce pay. Monetary values use Prisma Decimal rather than
+JavaScript floating-point arithmetic. Deploy
+`20260721150000_add_payslip_module` before using these routes.
