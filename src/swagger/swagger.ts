@@ -61,6 +61,14 @@ const options: swaggerJsdoc.Options = {
         name: 'Daily Tasks',
         description: 'Date-based employee work reports, Jira links, and attachments',
       },
+      {
+        name: 'Payroll',
+        description: 'Monthly payroll generation, approval, and payment processing',
+      },
+      {
+        name: 'Payslips',
+        description: 'Payslip review, employee self-service, adjustments, and PDF downloads',
+      },
     ],
   },
   // Use relative paths from project root

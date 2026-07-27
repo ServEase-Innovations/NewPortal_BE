@@ -22,8 +22,8 @@ model Employee {
   isActive Boolean @default(true) @map("is_active")
   joinedAt BigInt  @map("joined_at")
 
-  managerId          BigInt?        @map("manager_id")
-  teamId             String?        @map("team_id")
+  managerId BigInt? @map("manager_id")
+  teamId    String? @map("team_id")
 
   last_login    BigInt?
   password      String
@@ -32,6 +32,12 @@ model Employee {
 
   attendance           Attendance[]
   dailyTaskSubmissions DailyTaskSubmission[]
+  payslips             Payslip[]             @relation("EmployeePayslips")
+  createdPayrollRuns   PayrollRun[]          @relation("PayrollRunCreatedBy")
+  approvedPayrollRuns  PayrollRun[]          @relation("PayrollRunApprovedBy")
+  approvedPayslips     Payslip[]             @relation("PayslipApprovedBy")
+  paidPayslips         Payslip[]             @relation("PayslipPaidBy")
+  payslipAuditLogs     PayslipAuditLog[]     @relation("PayslipAuditPerformedBy")
 
   manager      Employee?  @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
   subordinates Employee[] @relation("ManagerSubordinates")
@@ -120,6 +126,124 @@ model DailyTaskAttachment {
   @@map("daily_task_attachments")
 }
 
+model PayrollRun {
+  payrollRunId BigInt           @id @default(autoincrement()) @map("payroll_run_id")
+  payrollMonth Int              @map("payroll_month")
+  payrollYear  Int              @map("payroll_year")
+  periodStart  BigInt           @map("period_start")
+  periodEnd    BigInt           @map("period_end")
+  currency     String           @default("INR") @db.VarChar(3)
+  status       PayrollRunStatus @default(Draft)
+  createdById  BigInt           @map("created_by_id")
+  approvedById BigInt?          @map("approved_by_id")
+  approvedAt   BigInt?          @map("approved_at")
+  paidAt       BigInt?          @map("paid_at")
+  createdAt    BigInt           @map("created_at")
+  updatedAt    BigInt           @map("updated_at")
+
+  createdBy  Employee  @relation("PayrollRunCreatedBy", fields: [createdById], references: [employeeId], onDelete: Restrict)
+  approvedBy Employee? @relation("PayrollRunApprovedBy", fields: [approvedById], references: [employeeId], onDelete: Restrict)
+  payslips   Payslip[]
+
+  @@unique([payrollMonth, payrollYear], name: "unique_payroll_month_year")
+  @@index([status, payrollYear, payrollMonth], map: "idx_payroll_run_status_period")
+  @@map("payroll_runs")
+}
+
+model Payslip {
+  payslipId     BigInt @id @default(autoincrement()) @map("payslip_id")
+  payrollRunId  BigInt @map("payroll_run_id")
+  employeeId    BigInt @map("employee_id")
+  payslipNumber String @unique @map("payslip_number")
+
+  employeeNameSnapshot       String  @map("employee_name_snapshot")
+  employeeEmailSnapshot      String  @map("employee_email_snapshot")
+  employeeRoleSnapshot       String  @map("employee_role_snapshot")
+  employeeDepartmentSnapshot String  @map("employee_department_snapshot")
+  bankAccountMasked          String? @map("bank_account_masked")
+  currency                   String  @default("INR") @db.VarChar(3)
+
+  workingDays     Decimal @map("working_days") @db.Decimal(6, 2)
+  payableDays     Decimal @map("payable_days") @db.Decimal(6, 2)
+  unpaidLeaveDays Decimal @default(0) @map("unpaid_leave_days") @db.Decimal(6, 2)
+
+  baseSalarySnapshot Decimal @map("base_salary_snapshot") @db.Decimal(12, 2)
+  allowanceSnapshot  Decimal @default(0) @map("allowance_snapshot") @db.Decimal(12, 2)
+  deductionSnapshot  Decimal @default(0) @map("deduction_snapshot") @db.Decimal(12, 2)
+  totalEarnings      Decimal @map("total_earnings") @db.Decimal(12, 2)
+  totalDeductions    Decimal @map("total_deductions") @db.Decimal(12, 2)
+  netSalary          Decimal @map("net_salary") @db.Decimal(12, 2)
+
+  status           PayslipStatus @default(Draft)
+  generatedAt      BigInt        @map("generated_at")
+  updatedAt        BigInt        @map("updated_at")
+  approvedAt       BigInt?       @map("approved_at")
+  approvedById     BigInt?       @map("approved_by_id")
+  paidAt           BigInt?       @map("paid_at")
+  paidById         BigInt?       @map("paid_by_id")
+  paymentReference String?       @map("payment_reference")
+  pdfUrl           String?       @map("pdf_url") @db.Text
+
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [payrollRunId], onDelete: Restrict)
+  employee   Employee   @relation("EmployeePayslips", fields: [employeeId], references: [employeeId], onDelete: Restrict)
+  approvedBy Employee?  @relation("PayslipApprovedBy", fields: [approvedById], references: [employeeId], onDelete: Restrict)
+  paidBy     Employee?  @relation("PayslipPaidBy", fields: [paidById], references: [employeeId], onDelete: Restrict)
+
+  earnings   PayslipEarning[]
+  deductions PayslipDeduction[]
+  auditLogs  PayslipAuditLog[]
+
+  @@unique([payrollRunId, employeeId], name: "unique_employee_payroll_run")
+  @@index([employeeId, generatedAt], map: "idx_payslip_employee_generated")
+  @@index([status, generatedAt], map: "idx_payslip_status_generated")
+  @@map("payslips")
+}
+
+model PayslipEarning {
+  payslipEarningId BigInt  @id @default(autoincrement()) @map("payslip_earning_id")
+  payslipId        BigInt  @map("payslip_id")
+  earningType      String  @map("earning_type")
+  description      String?
+  amount           Decimal @db.Decimal(12, 2)
+  isTaxable        Boolean @default(true) @map("is_taxable")
+  createdAt        BigInt  @map("created_at")
+
+  payslip Payslip @relation(fields: [payslipId], references: [payslipId], onDelete: Cascade)
+
+  @@index([payslipId], map: "idx_payslip_earning_payslip")
+  @@map("payslip_earnings")
+}
+
+model PayslipDeduction {
+  payslipDeductionId BigInt  @id @default(autoincrement()) @map("payslip_deduction_id")
+  payslipId          BigInt  @map("payslip_id")
+  deductionType      String  @map("deduction_type")
+  description        String?
+  amount             Decimal @db.Decimal(12, 2)
+  createdAt          BigInt  @map("created_at")
+
+  payslip Payslip @relation(fields: [payslipId], references: [payslipId], onDelete: Cascade)
+
+  @@index([payslipId], map: "idx_payslip_deduction_payslip")
+  @@map("payslip_deductions")
+}
+
+model PayslipAuditLog {
+  payslipAuditLogId BigInt @id @default(autoincrement()) @map("payslip_audit_log_id")
+  payslipId         BigInt @map("payslip_id")
+  action            String
+  performedById     BigInt @map("performed_by_id")
+  previousData      Json?  @map("previous_data")
+  updatedData       Json?  @map("updated_data")
+  createdAt         BigInt @map("created_at")
+
+  payslip     Payslip  @relation(fields: [payslipId], references: [payslipId], onDelete: Cascade)
+  performedBy Employee @relation("PayslipAuditPerformedBy", fields: [performedById], references: [employeeId], onDelete: Restrict)
+
+  @@index([payslipId, createdAt], map: "idx_payslip_audit_payslip_created")
+  @@map("payslip_audit_logs")
+}
+
 enum EmployeeRole {
   SuperAdmin
   Manager
@@ -138,6 +262,21 @@ enum AttendanceStatus {
 enum DailyTaskStatus {
   Pending
   Completed
+}
+
+enum PayrollRunStatus {
+  Draft
+  Processing
+  Approved
+  Paid
+  Cancelled
+}
+
+enum PayslipStatus {
+  Draft
+  Approved
+  Paid
+  Cancelled
 }
 
 enum AppraisalState {
