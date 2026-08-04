@@ -28,16 +28,6 @@ const deductionSchema = z.object({
   amount: moneyValue,
 });
 
-export const createPayrollRunSchema = z.object({
-  payrollMonth: z.number().int().min(1).max(12),
-  payrollYear: z.number().int().min(2000).max(2200),
-  currency: z.string().trim().length(3).transform((value) => value.toUpperCase()).optional().default("INR"),
-});
-
-export const generatePayslipsSchema = z.object({
-  employeeIds: z.array(positiveIntegerId).max(500).optional(),
-});
-
 // Single-employee generation: employeeId is the only identifier used for
 // every subsequent read/update/download operation. date + month + year are
 // required so a payslip can be generated for a specific employee (e.g. a
@@ -66,11 +56,6 @@ export const employeePayslipPeriodSchema = z.object({
   year: z.string().regex(/^\d{4}$/, "Year must contain four digits"),
 });
 
-export const payrollRunListQuerySchema = z.object({
-  year: z.string().regex(/^\d{4}$/, "Year must contain four digits").optional(),
-  status: z.enum(["Draft", "Processing", "Approved", "Paid", "Cancelled"]).optional(),
-});
-
 export const payslipListQuerySchema = z.object({
   employeeId: positiveIntegerId.optional(),
   month: z.string().regex(/^(?:[1-9]|1[0-2])$/, "Month must be between 1 and 12").optional(),
@@ -91,11 +76,5 @@ export const updatePayslipSchema = z
     message: "Provide at least one payslip field to update",
   });
 
-export const markPayrollPaidSchema = z.object({
-  paymentReference: z.string().trim().min(1).max(200).optional(),
-});
-
-export type CreatePayrollRunInput = z.infer<typeof createPayrollRunSchema>;
-export type GeneratePayslipsInput = z.infer<typeof generatePayslipsSchema>;
 export type UpdatePayslipInput = z.infer<typeof updatePayslipSchema>;
 export type GeneratePayslipForEmployeeInput = z.infer<typeof generatePayslipForEmployeeSchema>;

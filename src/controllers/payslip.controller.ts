@@ -4,26 +4,16 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { createPayslipPdfBuffer } from "../services/payslip-pdf.service";
 import {
-  approvePayrollRunService,
-  createPayrollRunService,
   generatePayslipForEmployeeService,
-  generatePayslipsService,
-  getPayrollRunByIdService,
-  getPayrollRunsService,
   getPayslipByEmployeePeriodService,
   getPayslipsService,
-  markPayrollRunPaidService,
   PayrollDomainError,
   updateDraftPayslipByEmployeeService,
 } from "../services/payslip.service";
 import {
-  createPayrollRunSchema,
   employeePayslipPeriodSchema,
   employeePayslipQuerySchema,
   generatePayslipForEmployeeSchema,
-  generatePayslipsSchema,
-  markPayrollPaidSchema,
-  payrollRunListQuerySchema,
   payslipListQuerySchema,
   updatePayslipSchema,
 } from "../validations/payslip.validation";
@@ -149,32 +139,6 @@ export const serializePayslip = (payslip: any) => ({
   })),
 });
 
-const serializePayrollRun = (payrollRun: any) => ({
-  payrollRunId: payrollRun.payrollRunId.toString(),
-  payrollMonth: payrollRun.payrollMonth,
-  payrollYear: payrollRun.payrollYear,
-  periodStart: epochDayToDateOnly(payrollRun.periodStart),
-  periodStartEpoch: payrollRun.periodStart.toString(),
-  periodEnd: epochDayToDateOnly(payrollRun.periodEnd),
-  periodEndEpoch: payrollRun.periodEnd.toString(),
-  currency: payrollRun.currency,
-  status: payrollRun.status,
-  createdById: payrollRun.createdById.toString(),
-  approvedById: payrollRun.approvedById?.toString() ?? null,
-  approvedAt: payrollRun.approvedAt ? epochToIso(payrollRun.approvedAt) : null,
-  approvedAtEpoch: payrollRun.approvedAt?.toString() ?? null,
-  paidAt: payrollRun.paidAt ? epochToIso(payrollRun.paidAt) : null,
-  paidAtEpoch: payrollRun.paidAt?.toString() ?? null,
-  createdAt: epochToIso(payrollRun.createdAt),
-  createdAtEpoch: payrollRun.createdAt.toString(),
-  updatedAt: epochToIso(payrollRun.updatedAt),
-  updatedAtEpoch: payrollRun.updatedAt.toString(),
-  createdBy: serializeEmployeeSummary(payrollRun.createdBy),
-  approvedBy: serializeEmployeeSummary(payrollRun.approvedBy),
-  payslipCount: payrollRun._count?.payslips ?? payrollRun.payslips?.length ?? 0,
-  payslips: payrollRun.payslips?.map(serializePayslip),
-});
-
 const sendError = (res: Response, error: unknown, fallbackMessage: string) => {
   if (error instanceof PayrollDomainError) {
     return res.status(error.statusCode).json({ message: error.message });
@@ -196,131 +160,6 @@ const sendError = (res: Response, error: unknown, fallbackMessage: string) => {
     message: fallbackMessage,
     error: process.env.NODE_ENV === "development" ? details : undefined,
   });
-};
-
-export const createPayrollRun = async (req: AuthRequest, res: Response) => {
-  if (!req.employee) return res.status(401).json({ message: "Authentication required" });
-
-  const result = createPayrollRunSchema.safeParse(req.body);
-  if (!result.success) {
-    return res.status(400).json({ message: "Validation failed", errors: result.error.flatten() });
-  }
-
-  try {
-    const payrollRun = await createPayrollRunService({
-      ...result.data,
-      createdById: BigInt(req.employee.employeeId),
-      timestamp: nowEpoch(),
-    });
-    return res.status(201).json({
-      message: "Payroll run created successfully",
-      payrollRun: serializePayrollRun(payrollRun),
-    });
-  } catch (error) {
-    return sendError(res, error, "Failed to create payroll run");
-  }
-};
-
-export const getPayrollRuns = async (req: AuthRequest, res: Response) => {
-  const result = payrollRunListQuerySchema.safeParse(req.query);
-  if (!result.success) {
-    return res.status(400).json({ message: "Validation failed", errors: result.error.flatten() });
-  }
-
-  try {
-    const payrollRuns = await getPayrollRunsService({
-      year: result.data.year ? Number(result.data.year) : undefined,
-      status: result.data.status,
-    });
-    return res.json({ count: payrollRuns.length, payrollRuns: payrollRuns.map(serializePayrollRun) });
-  } catch (error) {
-    return sendError(res, error, "Failed to fetch payroll runs");
-  }
-};
-
-export const getPayrollRunById = async (req: AuthRequest, res: Response) => {
-  const payrollRunId = parsePositiveBigInt(req.params.id);
-  if (!payrollRunId) return res.status(400).json({ message: "Invalid payroll run ID" });
-
-  try {
-    const payrollRun = await getPayrollRunByIdService(payrollRunId);
-    if (!payrollRun) return res.status(404).json({ message: "Payroll run not found" });
-    return res.json({ payrollRun: serializePayrollRun(payrollRun) });
-  } catch (error) {
-    return sendError(res, error, "Failed to fetch payroll run");
-  }
-};
-
-export const generatePayslips = async (req: AuthRequest, res: Response) => {
-  if (!req.employee) return res.status(401).json({ message: "Authentication required" });
-  const payrollRunId = parsePositiveBigInt(req.params.id);
-  if (!payrollRunId) return res.status(400).json({ message: "Invalid payroll run ID" });
-
-  const result = generatePayslipsSchema.safeParse(req.body || {});
-  if (!result.success) {
-    return res.status(400).json({ message: "Validation failed", errors: result.error.flatten() });
-  }
-
-  try {
-    const payrollRun = await generatePayslipsService({
-      payrollRunId,
-      employeeIds: result.data.employeeIds?.map(BigInt),
-      performedById: BigInt(req.employee.employeeId),
-      timestamp: nowEpoch(),
-    });
-    return res.status(201).json({
-      message: "Payslips generated successfully",
-      payrollRun: serializePayrollRun(payrollRun),
-    });
-  } catch (error) {
-    return sendError(res, error, "Failed to generate payslips");
-  }
-};
-
-export const approvePayrollRun = async (req: AuthRequest, res: Response) => {
-  if (!req.employee) return res.status(401).json({ message: "Authentication required" });
-  const payrollRunId = parsePositiveBigInt(req.params.id);
-  if (!payrollRunId) return res.status(400).json({ message: "Invalid payroll run ID" });
-
-  try {
-    const payrollRun = await approvePayrollRunService({
-      payrollRunId,
-      approvedById: BigInt(req.employee.employeeId),
-      timestamp: nowEpoch(),
-    });
-    return res.json({
-      message: "Payroll run and payslips approved successfully",
-      payrollRun: serializePayrollRun(payrollRun),
-    });
-  } catch (error) {
-    return sendError(res, error, "Failed to approve payroll run");
-  }
-};
-
-export const markPayrollRunPaid = async (req: AuthRequest, res: Response) => {
-  if (!req.employee) return res.status(401).json({ message: "Authentication required" });
-  const payrollRunId = parsePositiveBigInt(req.params.id);
-  if (!payrollRunId) return res.status(400).json({ message: "Invalid payroll run ID" });
-
-  const result = markPayrollPaidSchema.safeParse(req.body || {});
-  if (!result.success) {
-    return res.status(400).json({ message: "Validation failed", errors: result.error.flatten() });
-  }
-
-  try {
-    const payrollRun = await markPayrollRunPaidService({
-      payrollRunId,
-      paidById: BigInt(req.employee.employeeId),
-      paymentReference: result.data.paymentReference,
-      timestamp: nowEpoch(),
-    });
-    return res.json({
-      message: "Payroll run marked as paid",
-      payrollRun: serializePayrollRun(payrollRun),
-    });
-  } catch (error) {
-    return sendError(res, error, "Failed to mark payroll run as paid");
-  }
 };
 
 export const getPayslips = async (req: AuthRequest, res: Response) => {
