@@ -6,26 +6,36 @@ import { createPayslipPdfBuffer } from "../services/payslip-pdf.service";
 import {
   approvePayrollRunService,
   createPayrollRunService,
+  generatePayslipForEmployeeService,
   generatePayslipsService,
   getPayrollRunByIdService,
   getPayrollRunsService,
-  getPayslipByIdService,
+  getPayslipByEmployeePeriodService,
   getPayslipsService,
   markPayrollRunPaidService,
   PayrollDomainError,
-  updateDraftPayslipService,
+  updateDraftPayslipByEmployeeService,
 } from "../services/payslip.service";
 import {
   createPayrollRunSchema,
+  employeePayslipPeriodSchema,
+  employeePayslipQuerySchema,
+  generatePayslipForEmployeeSchema,
   generatePayslipsSchema,
   markPayrollPaidSchema,
   payrollRunListQuerySchema,
   payslipListQuerySchema,
   updatePayslipSchema,
 } from "../validations/payslip.validation";
-import { epochDayToDateOnly, epochToIso, nowEpoch } from "../utils/epoch";
+import { currentDateOnly, epochDayToDateOnly, epochToIso, nowEpoch } from "../utils/epoch";
 
-const payrollAdminRoles = new Set(["SuperAdmin", "HR"]);
+// SuperAdmin and Manager have full access to every payslip/payroll workflow
+// (generation, approval, mark-paid, editing, viewing all employees) and may
+// generate payslips as many times as needed.
+const payrollAdminRoles = new Set(["SuperAdmin", "Manager"]);
+
+// Developer, Marketing, CustomStaff and HR can only view/download their own
+// payslips, and only for the current or previous calendar month.
 const employeeVisibleStatuses: PayslipStatus[] = [
   PayslipStatus.Approved,
   PayslipStatus.Paid,
@@ -41,6 +51,21 @@ const parsePositiveBigInt = (value: unknown): bigint | null => {
   if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
   const parsed = BigInt(value);
   return parsed > 0n ? parsed : null;
+};
+
+/**
+ * Restricted roles may only ever see the current or previous calendar
+ * month's payslip. Admin roles are not subject to this check.
+ */
+const isCurrentOrPreviousPeriod = (month: number, year: number): boolean => {
+  const [currentYearStr, currentMonthStr] = currentDateOnly().split("-");
+  const currentYear = Number(currentYearStr);
+  const currentMonth = Number(currentMonthStr);
+
+  const requestedIndex = year * 12 + (month - 1);
+  const currentIndex = currentYear * 12 + (currentMonth - 1);
+
+  return currentIndex - requestedIndex >= 0 && currentIndex - requestedIndex <= 1;
 };
 
 const serializeEmployeeSummary = (employee: any) =>
@@ -344,70 +369,166 @@ export const getMyPayslips = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getPayslipById = async (req: AuthRequest, res: Response) => {
-  const payslipId = parsePositiveBigInt(req.params.id);
-  if (!payslipId) return res.status(400).json({ message: "Invalid payslip ID" });
-
-  try {
-    const payslip = await getPayslipByIdService(payslipId);
-    if (!payslip) return res.status(404).json({ message: "Payslip not found" });
-
-    if (!isPayrollAdmin(req) && !isOwner(req, payslip.employeeId)) {
-      return res.status(403).json({ message: "You cannot view this payslip" });
-    }
-    if (
-      !isPayrollAdmin(req) &&
-      !employeeVisibleStatuses.includes(payslip.status)
-    ) {
-      return res.status(403).json({ message: "This payslip is not available yet" });
-    }
-
-    return res.json({ payslip: serializePayslip(payslip) });
-  } catch (error) {
-    return sendError(res, error, "Failed to fetch payslip");
-  }
-};
-
-export const updatePayslip = async (req: AuthRequest, res: Response) => {
+/**
+ * Generates a payslip for one employee, identified by employeeId + date +
+ * month + year. SuperAdmin/Manager only. Works no matter what state the
+ * target payroll run is in (Draft, Approved, even Paid) - a payslip for a
+ * new employee is never blocked by a run-status conflict.
+ */
+export const generatePayslipForEmployee = async (req: AuthRequest, res: Response) => {
   if (!req.employee) return res.status(401).json({ message: "Authentication required" });
-  const payslipId = parsePositiveBigInt(req.params.id);
-  if (!payslipId) return res.status(400).json({ message: "Invalid payslip ID" });
 
-  const result = updatePayslipSchema.safeParse(req.body);
+  const result = generatePayslipForEmployeeSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ message: "Validation failed", errors: result.error.flatten() });
   }
 
   try {
-    const payslip = await updateDraftPayslipService({
-      payslipId,
-      changes: result.data,
+    const payslip = await generatePayslipForEmployeeService({
+      employeeId: BigInt(result.data.employeeId),
+      date: result.data.date,
+      month: result.data.month,
+      year: result.data.year,
+      performedById: BigInt(req.employee.employeeId),
+      timestamp: nowEpoch(),
+    });
+    return res.status(201).json({
+      message: "Payslip generated successfully",
+      payslip: payslip ? serializePayslip(payslip) : undefined,
+    });
+  } catch (error) {
+    return sendError(res, error, "Failed to generate payslip");
+  }
+};
+
+/**
+ * Fetches payslip(s) for one employee - employeeId is the only identifier
+ * used. Pass month+year to get exactly one period; omit them to list the
+ * employee's full history (admins only - restricted roles must always
+ * scope to a period, and only the current/previous month).
+ */
+export const getPayslipsByEmployee = async (req: AuthRequest, res: Response) => {
+  if (!req.employee) return res.status(401).json({ message: "Authentication required" });
+  const employeeId = parsePositiveBigInt(req.params.employeeId);
+  if (!employeeId) return res.status(400).json({ message: "Invalid employee ID" });
+
+  if (!isPayrollAdmin(req) && !isOwner(req, employeeId)) {
+    return res.status(403).json({ message: "You cannot view this employee's payslips" });
+  }
+
+  const result = employeePayslipQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    return res.status(400).json({ message: "Validation failed", errors: result.error.flatten() });
+  }
+
+  const admin = isPayrollAdmin(req);
+  if (!admin && result.data.status && !employeeVisibleStatuses.includes(result.data.status)) {
+    return res.status(400).json({ message: "You can only view Approved or Paid payslips" });
+  }
+
+  const month = result.data.month ? Number(result.data.month) : undefined;
+  const year = result.data.year ? Number(result.data.year) : undefined;
+
+  if (!admin && month !== undefined && year !== undefined && !isCurrentOrPreviousPeriod(month, year)) {
+    return res.status(403).json({
+      message: "You can only view payslips for the current or previous month",
+    });
+  }
+
+  try {
+    if (month !== undefined && year !== undefined) {
+      const payslip = await getPayslipByEmployeePeriodService(employeeId, month, year);
+      if (!payslip) return res.status(404).json({ message: "Payslip not found" });
+      if (!admin && !employeeVisibleStatuses.includes(payslip.status)) {
+        return res.status(403).json({ message: "This payslip is not available yet" });
+      }
+      return res.json({ payslip: serializePayslip(payslip) });
+    }
+
+    if (!admin) {
+      return res.status(400).json({ message: "month and year are required" });
+    }
+
+    const payslips = await getPayslipsService({
+      employeeId,
+      status: result.data.status,
+    });
+    return res.json({ count: payslips.length, payslips: payslips.map(serializePayslip) });
+  } catch (error) {
+    return sendError(res, error, "Failed to fetch payslips");
+  }
+};
+
+/**
+ * Edits a draft payslip - employeeId + month + year identify it, no
+ * payslipId is ever exposed to the caller. SuperAdmin/Manager only.
+ */
+export const updatePayslipByEmployee = async (req: AuthRequest, res: Response) => {
+  if (!req.employee) return res.status(401).json({ message: "Authentication required" });
+  const employeeId = parsePositiveBigInt(req.params.employeeId);
+  if (!employeeId) return res.status(400).json({ message: "Invalid employee ID" });
+
+  const periodResult = employeePayslipPeriodSchema.safeParse(req.query);
+  if (!periodResult.success) {
+    return res.status(400).json({ message: "Validation failed", errors: periodResult.error.flatten() });
+  }
+
+  const bodyResult = updatePayslipSchema.safeParse(req.body);
+  if (!bodyResult.success) {
+    return res.status(400).json({ message: "Validation failed", errors: bodyResult.error.flatten() });
+  }
+
+  try {
+    const payslip = await updateDraftPayslipByEmployeeService({
+      employeeId,
+      month: Number(periodResult.data.month),
+      year: Number(periodResult.data.year),
+      changes: bodyResult.data,
       performedById: BigInt(req.employee.employeeId),
       timestamp: nowEpoch(),
     });
     return res.json({
       message: "Draft payslip updated successfully",
-      payslip: serializePayslip(payslip),
+      payslip: payslip ? serializePayslip(payslip) : undefined,
     });
   } catch (error) {
     return sendError(res, error, "Failed to update payslip");
   }
 };
 
-export const downloadPayslipPdf = async (req: AuthRequest, res: Response) => {
-  const payslipId = parsePositiveBigInt(req.params.id);
-  if (!payslipId) return res.status(400).json({ message: "Invalid payslip ID" });
+/**
+ * Downloads a payslip PDF - employeeId + month + year only. Restricted
+ * roles may only download their own payslip, and only for the current or
+ * previous calendar month.
+ */
+export const downloadPayslipPdfByEmployee = async (req: AuthRequest, res: Response) => {
+  if (!req.employee) return res.status(401).json({ message: "Authentication required" });
+  const employeeId = parsePositiveBigInt(req.params.employeeId);
+  if (!employeeId) return res.status(400).json({ message: "Invalid employee ID" });
+
+  if (!isPayrollAdmin(req) && !isOwner(req, employeeId)) {
+    return res.status(403).json({ message: "You cannot download this employee's payslip" });
+  }
+
+  const periodResult = employeePayslipPeriodSchema.safeParse(req.query);
+  if (!periodResult.success) {
+    return res.status(400).json({ message: "Validation failed", errors: periodResult.error.flatten() });
+  }
+
+  const month = Number(periodResult.data.month);
+  const year = Number(periodResult.data.year);
+  const admin = isPayrollAdmin(req);
+
+  if (!admin && !isCurrentOrPreviousPeriod(month, year)) {
+    return res.status(403).json({
+      message: "You can only download payslips for the current or previous month",
+    });
+  }
 
   try {
-    const payslip = await getPayslipByIdService(payslipId);
+    const payslip = await getPayslipByEmployeePeriodService(employeeId, month, year);
     if (!payslip) return res.status(404).json({ message: "Payslip not found" });
-    if (!isPayrollAdmin(req) && !isOwner(req, payslip.employeeId)) {
-      return res.status(403).json({ message: "You cannot download this payslip" });
-    }
-    if (
-      !isPayrollAdmin(req) &&
-      !employeeVisibleStatuses.includes(payslip.status)
-    ) {
+    if (!admin && !employeeVisibleStatuses.includes(payslip.status)) {
       return res.status(403).json({ message: "This payslip is not available yet" });
     }
 

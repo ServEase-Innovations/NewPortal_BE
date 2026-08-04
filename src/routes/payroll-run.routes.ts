@@ -11,7 +11,8 @@ import {
 import { authenticate, authorize } from "../middleware/auth.middleware";
 
 const router = Router();
-const payrollAdmins = authorize("SuperAdmin", "HR");
+// SuperAdmin and Manager have full access to all payroll workflows.
+const payrollAdmins = authorize("SuperAdmin", "Manager");
 
 /**
  * @swagger
@@ -76,7 +77,12 @@ router.get("/:id", authenticate, payrollAdmins, getPayrollRunById);
  * /payroll-runs/{id}/generate:
  *   post:
  *     summary: Generate draft payslips from employee salary and attendance snapshots
- *     description: Generates all active employees by default. Existing payslips in the run are skipped safely.
+ *     description: >
+ *       Generates all active employees by default. Existing payslips in the
+ *       run are skipped safely. SuperAdmin/Manager may call this
+ *       repeatedly at any point in the run's lifecycle (including after
+ *       Approval or Paid) - a new employee is never blocked by a
+ *       run-status conflict.
  *     tags: [Payroll]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -95,7 +101,6 @@ router.get("/:id", authenticate, payrollAdmins, getPayrollRunById);
  *                 items: { type: string, example: "4" }
  *     responses:
  *       201: { description: Draft payslips generated }
- *       409: { description: Payroll run is not Draft }
  */
 router.post("/:id/generate", authenticate, payrollAdmins, generatePayslips);
 

@@ -7,6 +7,7 @@ import {
 
 import prisma from "../prisma";
 import type { UpdatePayslipInput } from "../validations/payslip.validation";
+import { dateOnlyToEpoch } from "../utils/epoch";
 
 const payslipInclude = {
   employee: {
@@ -201,6 +202,88 @@ export const getPayrollRunByIdService = (payrollRunId: bigint) =>
     include: payrollRunInclude,
   });
 
+/**
+ * Computes the earning/deduction line items and totals for one employee
+ * over a given (possibly prorated) period. Shared by the bulk payroll-run
+ * generator and the single-employee (new joiner) generator so both produce
+ * identical, consistent payslip figures.
+ */
+const buildEmployeePayslipFigures = (
+  employee: {
+    baseSalary: MoneyInput;
+    allowances: MoneyInput;
+    deductions: MoneyInput;
+    attendance: { shiftStatus: AttendanceStatus }[];
+  },
+  workingDays: number
+) => {
+  const absentDays = Math.min(
+    employee.attendance.filter(
+      (attendance) => attendance.shiftStatus === AttendanceStatus.Absent
+    ).length,
+    workingDays
+  );
+  const payableDays = Math.max(workingDays - absentDays, 0);
+  const baseSalary = toMoney(employee.baseSalary);
+  const allowances = toMoney(employee.allowances);
+  const fixedDeductions = toMoney(employee.deductions);
+  const unpaidLeaveDeduction =
+    workingDays > 0
+      ? baseSalary.dividedBy(workingDays).times(absentDays).toDecimalPlaces(2)
+      : new Prisma.Decimal(0);
+
+  const earnings: LineItemInput[] = [
+    {
+      type: "Basic Salary",
+      description: "Monthly base salary",
+      amount: baseSalary,
+      isTaxable: true,
+    },
+  ];
+
+  if (allowances.greaterThan(0)) {
+    earnings.push({
+      type: "Allowances",
+      description: "Employee allowance snapshot",
+      amount: allowances,
+      isTaxable: true,
+    });
+  }
+
+  const deductions: LineItemInput[] = [];
+  if (fixedDeductions.greaterThan(0)) {
+    deductions.push({
+      type: "Standard Deductions",
+      description: "Employee deduction snapshot",
+      amount: fixedDeductions,
+    });
+  }
+  if (unpaidLeaveDeduction.greaterThan(0)) {
+    deductions.push({
+      type: "Unpaid Leave",
+      description: `${absentDays} absent working day(s)`,
+      amount: unpaidLeaveDeduction,
+    });
+  }
+
+  const totalEarnings = sumMoney(earnings);
+  const totalDeductions = sumMoney(deductions);
+  const netSalary = totalEarnings.minus(totalDeductions).toDecimalPlaces(2);
+
+  return {
+    absentDays,
+    payableDays,
+    baseSalary,
+    allowances,
+    fixedDeductions,
+    earnings,
+    deductions,
+    totalEarnings,
+    totalDeductions,
+    netSalary,
+  };
+};
+
 export const generatePayslipsService = async (data: {
   payrollRunId: bigint;
   employeeIds?: bigint[];
@@ -216,17 +299,20 @@ export const generatePayslipsService = async (data: {
       throw new PayrollDomainError("Payroll run not found", 404);
     }
 
-    if (payrollRun.status !== PayrollRunStatus.Draft) {
-      throw new PayrollDomainError(
-        "Payslips can only be generated while the payroll run is Draft",
-        409
-      );
-    }
+    // Note: generation is intentionally no longer restricted to Draft runs.
+    // SuperAdmin/Manager can generate payslips for employees (e.g. new
+    // joiners) at any point in the run's lifecycle, including after it has
+    // been Approved or marked Paid. The Draft<->Processing flip below only
+    // applies while the run is still in its original Draft window so the
+    // very first bulk-generation pass behaves exactly as before.
+    const shouldTrackProcessingState = payrollRun.status === PayrollRunStatus.Draft;
 
-    await transaction.payrollRun.update({
-      where: { payrollRunId: data.payrollRunId },
-      data: { status: PayrollRunStatus.Processing, updatedAt: data.timestamp },
-    });
+    if (shouldTrackProcessingState) {
+      await transaction.payrollRun.update({
+        where: { payrollRunId: data.payrollRunId },
+        data: { status: PayrollRunStatus.Processing, updatedAt: data.timestamp },
+      });
+    }
 
     const employees = await transaction.employee.findMany({
       where: {
@@ -289,58 +375,18 @@ export const generatePayslipsService = async (data: {
     for (const employee of employees) {
       if (existingEmployeeIds.has(employee.employeeId.toString())) continue;
 
-      const absentDays = Math.min(
-        employee.attendance.filter(
-          (attendance) => attendance.shiftStatus === AttendanceStatus.Absent
-        ).length,
-        workingDays
-      );
-      const payableDays = Math.max(workingDays - absentDays, 0);
-      const baseSalary = toMoney(employee.baseSalary);
-      const allowances = toMoney(employee.allowances);
-      const fixedDeductions = toMoney(employee.deductions);
-      const unpaidLeaveDeduction =
-        workingDays > 0
-          ? baseSalary.dividedBy(workingDays).times(absentDays).toDecimalPlaces(2)
-          : new Prisma.Decimal(0);
-
-      const earnings: LineItemInput[] = [
-        {
-          type: "Basic Salary",
-          description: "Monthly base salary",
-          amount: baseSalary,
-          isTaxable: true,
-        },
-      ];
-
-      if (allowances.greaterThan(0)) {
-        earnings.push({
-          type: "Allowances",
-          description: "Employee allowance snapshot",
-          amount: allowances,
-          isTaxable: true,
-        });
-      }
-
-      const deductions: LineItemInput[] = [];
-      if (fixedDeductions.greaterThan(0)) {
-        deductions.push({
-          type: "Standard Deductions",
-          description: "Employee deduction snapshot",
-          amount: fixedDeductions,
-        });
-      }
-      if (unpaidLeaveDeduction.greaterThan(0)) {
-        deductions.push({
-          type: "Unpaid Leave",
-          description: `${absentDays} absent working day(s)`,
-          amount: unpaidLeaveDeduction,
-        });
-      }
-
-      const totalEarnings = sumMoney(earnings);
-      const totalDeductions = sumMoney(deductions);
-      const netSalary = totalEarnings.minus(totalDeductions).toDecimalPlaces(2);
+      const {
+        absentDays,
+        payableDays,
+        baseSalary,
+        allowances,
+        fixedDeductions,
+        earnings,
+        deductions,
+        totalEarnings,
+        totalDeductions,
+        netSalary,
+      } = buildEmployeePayslipFigures(employee, workingDays);
 
       if (netSalary.lessThan(0)) {
         throw new PayrollDomainError(
@@ -408,14 +454,227 @@ export const generatePayslipsService = async (data: {
       });
     }
 
-    await transaction.payrollRun.update({
-      where: { payrollRunId: data.payrollRunId },
-      data: { status: PayrollRunStatus.Draft, updatedAt: data.timestamp },
-    });
+    if (shouldTrackProcessingState) {
+      await transaction.payrollRun.update({
+        where: { payrollRunId: data.payrollRunId },
+        data: { status: PayrollRunStatus.Draft, updatedAt: data.timestamp },
+      });
+    } else {
+      await transaction.payrollRun.update({
+        where: { payrollRunId: data.payrollRunId },
+        data: { updatedAt: data.timestamp },
+      });
+    }
   });
 
   return getPayrollRunByIdService(data.payrollRunId);
 };
+
+/**
+ * Generates a single employee's payslip identified only by employeeId,
+ * date, month and year. Finds (or creates) the payroll run for the
+ * requested month/year automatically.
+ *
+ * Unlike the bulk generator's original behavior, this is deliberately
+ * allowed regardless of the payroll run's status - including Approved or
+ * Paid - so a payslip can always be generated for a new employee without
+ * hitting a run-status conflict error. If `date` falls after the run's
+ * period start (e.g. the employee's joining date), the payable period is
+ * prorated from that date through the end of the payroll period.
+ *
+ * SuperAdmin/Manager may call this repeatedly (for the same or different
+ * employees) with no artificial "one-shot" restriction.
+ */
+export const generatePayslipForEmployeeService = async (data: {
+  employeeId: bigint;
+  date: string;
+  month: number;
+  year: number;
+  performedById: bigint;
+  timestamp: bigint;
+}) => {
+  const dateEpoch = dateOnlyToEpoch(data.date);
+
+  const payslip = await prisma.$transaction(async (transaction) => {
+    let payrollRun = await transaction.payrollRun.findUnique({
+      where: {
+        unique_payroll_month_year: {
+          payrollMonth: data.month,
+          payrollYear: data.year,
+        },
+      },
+    });
+
+    if (!payrollRun) {
+      const period = getPayrollPeriod(data.year, data.month);
+      payrollRun = await transaction.payrollRun.create({
+        data: {
+          payrollMonth: data.month,
+          payrollYear: data.year,
+          ...period,
+          createdById: data.performedById,
+          createdAt: data.timestamp,
+          updatedAt: data.timestamp,
+        },
+      });
+    }
+
+    if (dateEpoch > payrollRun.periodEnd) {
+      throw new PayrollDomainError(
+        "The provided date falls after the payroll period end",
+        400
+      );
+    }
+
+    const existing = await transaction.payslip.findUnique({
+      where: {
+        unique_employee_payroll_run: {
+          payrollRunId: payrollRun.payrollRunId,
+          employeeId: data.employeeId,
+        },
+      },
+      select: { payslipId: true },
+    });
+
+    if (existing) {
+      throw new PayrollDomainError(
+        "A payslip already exists for this employee in the selected period",
+        409
+      );
+    }
+
+    const employee = await transaction.employee.findFirst({
+      where: { employeeId: data.employeeId, isActive: true },
+      select: {
+        employeeId: true,
+        fullName: true,
+        emailAddress: true,
+        assignedRole: true,
+        assignedDepartment: true,
+        baseSalary: true,
+        allowances: true,
+        deductions: true,
+      },
+    });
+
+    if (!employee) {
+      throw new PayrollDomainError("Active employee not found", 404);
+    }
+
+    const effectivePeriodStart =
+      dateEpoch > payrollRun.periodStart ? dateEpoch : payrollRun.periodStart;
+
+    const attendance = await transaction.attendance.findMany({
+      where: {
+        employeeId: data.employeeId,
+        calendarDate: { gte: effectivePeriodStart, lte: payrollRun.periodEnd },
+      },
+      select: { shiftStatus: true },
+    });
+
+    const workingDays = countBusinessDays(effectivePeriodStart, payrollRun.periodEnd);
+
+    const {
+      absentDays,
+      payableDays,
+      baseSalary,
+      allowances,
+      fixedDeductions,
+      earnings,
+      deductions,
+      totalEarnings,
+      totalDeductions,
+      netSalary,
+    } = buildEmployeePayslipFigures({ ...employee, attendance }, workingDays);
+
+    if (netSalary.lessThan(0)) {
+      throw new PayrollDomainError(
+        `Deductions exceed earnings for employee ${employee.employeeId}`,
+        400
+      );
+    }
+
+    const created = await transaction.payslip.create({
+      data: {
+        payrollRunId: payrollRun.payrollRunId,
+        employeeId: employee.employeeId,
+        payslipNumber: payslipNumberFor(
+          payrollRun.payrollYear,
+          payrollRun.payrollMonth,
+          employee.employeeId
+        ),
+        employeeNameSnapshot: employee.fullName,
+        employeeEmailSnapshot: employee.emailAddress,
+        employeeRoleSnapshot: employee.assignedRole,
+        employeeDepartmentSnapshot: employee.assignedDepartment,
+        currency: payrollRun.currency,
+        workingDays: toDayDecimal(workingDays),
+        payableDays: toDayDecimal(payableDays),
+        unpaidLeaveDays: toDayDecimal(absentDays),
+        baseSalarySnapshot: baseSalary,
+        allowanceSnapshot: allowances,
+        deductionSnapshot: fixedDeductions,
+        totalEarnings,
+        totalDeductions,
+        netSalary,
+        generatedAt: data.timestamp,
+        updatedAt: data.timestamp,
+        earnings: {
+          create: earnings.map((earning) => ({
+            earningType: earning.type,
+            description: earning.description,
+            amount: earning.amount,
+            isTaxable: earning.isTaxable ?? true,
+            createdAt: data.timestamp,
+          })),
+        },
+        deductions: {
+          create: deductions.map((deduction) => ({
+            deductionType: deduction.type,
+            description: deduction.description,
+            amount: deduction.amount,
+            createdAt: data.timestamp,
+          })),
+        },
+        auditLogs: {
+          create: {
+            action: "Generated",
+            performedById: data.performedById,
+            updatedData: {
+              status: PayslipStatus.Draft,
+              totalEarnings: totalEarnings.toFixed(2),
+              totalDeductions: totalDeductions.toFixed(2),
+              netSalary: netSalary.toFixed(2),
+              effectivePeriodStart: effectivePeriodStart.toString(),
+            },
+            createdAt: data.timestamp,
+          },
+        },
+      },
+    });
+
+    return created;
+  });
+
+  return getPayslipByIdService(payslip.payslipId);
+};
+
+/**
+ * Looks up a single payslip using employeeId + month + year only -
+ * the internal payslipId is never required by the caller.
+ */
+export const getPayslipByEmployeePeriodService = (
+  employeeId: bigint,
+  month: number,
+  year: number
+) =>
+  prisma.payslip.findFirst({
+    where: {
+      employeeId,
+      payrollRun: { payrollMonth: month, payrollYear: year },
+    },
+    include: payslipInclude,
+  });
 
 export const approvePayrollRunService = async (data: {
   payrollRunId: bigint;
@@ -554,6 +813,42 @@ export const getPayslipByIdService = (payslipId: bigint) =>
     where: { payslipId },
     include: payslipInclude,
   });
+
+/**
+ * Resolves employeeId + month/year to the underlying payslipId and then
+ * applies the same update logic as updateDraftPayslipService. Keeps
+ * employeeId as the only identifier callers ever need to supply.
+ */
+export const updateDraftPayslipByEmployeeService = async (data: {
+  employeeId: bigint;
+  month: number;
+  year: number;
+  changes: UpdatePayslipInput;
+  performedById: bigint;
+  timestamp: bigint;
+}) => {
+  const existing = await prisma.payslip.findFirst({
+    where: {
+      employeeId: data.employeeId,
+      payrollRun: { payrollMonth: data.month, payrollYear: data.year },
+    },
+    select: { payslipId: true },
+  });
+
+  if (!existing) {
+    throw new PayrollDomainError(
+      "No payslip found for this employee in the selected period",
+      404
+    );
+  }
+
+  return updateDraftPayslipService({
+    payslipId: existing.payslipId,
+    changes: data.changes,
+    performedById: data.performedById,
+    timestamp: data.timestamp,
+  });
+};
 
 export const updateDraftPayslipService = async (data: {
   payslipId: bigint;

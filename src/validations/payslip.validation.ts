@@ -38,6 +38,34 @@ export const generatePayslipsSchema = z.object({
   employeeIds: z.array(positiveIntegerId).max(500).optional(),
 });
 
+// Single-employee generation: employeeId is the only identifier used for
+// every subsequent read/update/download operation. date + month + year are
+// required so a payslip can be generated for a specific employee (e.g. a
+// new joiner) even after the payroll run for that month/year has already
+// moved past Draft - including Paid.
+export const generatePayslipForEmployeeSchema = z.object({
+  employeeId: positiveIntegerId,
+  date: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2000).max(2200),
+});
+
+// Used to list/query an employee's payslips (no month/year = full history).
+export const employeePayslipQuerySchema = z.object({
+  month: z.string().regex(/^(?:[1-9]|1[0-2])$/, "Month must be between 1 and 12").optional(),
+  year: z.string().regex(/^\d{4}$/, "Year must contain four digits").optional(),
+  status: z.enum(["Draft", "Approved", "Paid", "Cancelled"]).optional(),
+});
+
+// Used to locate exactly one payslip for an employee (update / pdf download).
+export const employeePayslipPeriodSchema = z.object({
+  month: z.string().regex(/^(?:[1-9]|1[0-2])$/, "Month must be between 1 and 12"),
+  year: z.string().regex(/^\d{4}$/, "Year must contain four digits"),
+});
+
 export const payrollRunListQuerySchema = z.object({
   year: z.string().regex(/^\d{4}$/, "Year must contain four digits").optional(),
   status: z.enum(["Draft", "Processing", "Approved", "Paid", "Cancelled"]).optional(),
@@ -70,3 +98,4 @@ export const markPayrollPaidSchema = z.object({
 export type CreatePayrollRunInput = z.infer<typeof createPayrollRunSchema>;
 export type GeneratePayslipsInput = z.infer<typeof generatePayslipsSchema>;
 export type UpdatePayslipInput = z.infer<typeof updatePayslipSchema>;
+export type GeneratePayslipForEmployeeInput = z.infer<typeof generatePayslipForEmployeeSchema>;
