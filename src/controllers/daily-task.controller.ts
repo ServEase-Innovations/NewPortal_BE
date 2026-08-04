@@ -129,12 +129,6 @@ export const createDailyTask = async (req: AuthRequest, res: Response) => {
       dailyTask: serializeDailyTask(task),
     });
   } catch (error: any) {
-    if (error?.code === "P2002") {
-      return res.status(409).json({
-        message: "You have already submitted a daily task for today",
-      });
-    }
-
     if (error?.code === "P2003") {
       return res.status(404).json({ message: "Employee not found" });
     }

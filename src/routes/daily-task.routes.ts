@@ -18,6 +18,7 @@ const router = Router();
  * /daily-tasks:
  *   post:
  *     summary: Submit today's daily work report
+ *     description: An employee can submit more than one report per day — there is no longer a one-report-per-day restriction.
  *     tags: [Daily Tasks]
  *     security:
  *       - bearerAuth: []
@@ -51,17 +52,53 @@ const router = Router();
  *                       example: PORTAL-142
  *                     url:
  *                       type: string
- *                       format: uri
  *                       example: https://company.atlassian.net/browse/PORTAL-142
  *     responses:
  *       201:
- *         description: Daily task submitted successfully
+ *         description: Daily task submitted successfully. The employeeId is not accepted as input; it is derived server-side from the authenticated user's token and returned in the response so it's always clear who submitted the report.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Daily task submitted successfully
+ *                 dailyTask:
+ *                   type: object
+ *                   properties:
+ *                     dailyTaskSubmissionId:
+ *                       type: string
+ *                     employeeId:
+ *                       type: string
+ *                       description: ID of the employee who submitted the report (taken from the authenticated session, not client-supplied)
+ *                     workDescription:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       enum: [Pending, Completed]
+ *                     newIdeas:
+ *                       type: string
+ *                       nullable: true
+ *                     submissionDate:
+ *                       type: string
+ *                       format: date
+ *                     submittedAt:
+ *                       type: string
+ *                       format: date-time
+ *                     jiraLinks:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           label:
+ *                             type: string
+ *                           url:
+ *                             type: string
  *       400:
  *         description: Validation failed
  *       401:
  *         description: Authentication required
- *       409:
- *         description: The employee already submitted a report today
  */
 router.post("/", authenticate, createDailyTask);
 

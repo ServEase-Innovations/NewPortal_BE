@@ -90,7 +90,7 @@ model DailyTaskSubmission {
   jiraLinks   DailyTaskJiraLink[]
   attachments DailyTaskAttachment[]
 
-  @@unique([employeeId, submissionDate], name: "unique_employee_daily_task")
+  @@index([employeeId, submissionDate], map: "idx_daily_task_employee_date")
   @@index([submissionDate], map: "idx_daily_task_submission_date")
   @@index([status, submissionDate], map: "idx_daily_task_status_date")
   @@map("daily_task_submissions")
