@@ -6,6 +6,8 @@ import {
   getAttendanceById,
   updateAttendance,
   deleteAttendance,
+  getAttendanceByEmployee,
+  getTodayAttendanceByEmployee,
 } from "../controllers/attendance.controller";
 
 const router = Router();
@@ -252,5 +254,109 @@ router.put("/:id", updateAttendance);
  *         description: Attendance deleted
  */
 router.delete("/:id", deleteAttendance);
+
+/**
+ * @swagger
+ * /attendance/employee/{employeeId}:
+ *   get:
+ *     summary: Get attendance records for a specific employee
+ *     description: Returns all attendance records for the specified employee, ordered by date (newest first)
+ *     tags:
+ *       - Attendance
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Employee ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Employee attendance records fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   attendanceId:
+ *                     type: string
+ *                   employeeId:
+ *                     type: integer
+ *                   calendarDate:
+ *                     type: integer
+ *                     description: Attendance date as epoch milliseconds
+ *                   shiftStatus:
+ *                     type: string
+ *                   clockInTimestamp:
+ *                     type: integer
+ *                   clockOutTimestamp:
+ *                     type: integer
+ *                   totalHoursComputed:
+ *                     type: number
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Insufficient permissions
+ *       500:
+ *         description: Server error
+ */
+router.get("/employee/:employeeId", getAttendanceByEmployee);
+
+/**
+ * @swagger
+ * /attendance/employee/{employeeId}/today:
+ *   get:
+ *     summary: Get today's attendance for a specific employee
+ *     description: Returns today's attendance record for the specified employee (if exists)
+ *     tags:
+ *       - Attendance
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Employee ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Today's attendance record found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 attendanceId:
+ *                   type: string
+ *                 employeeId:
+ *                   type: integer
+ *                 calendarDate:
+ *                   type: integer
+ *                   description: Attendance date as epoch milliseconds
+ *                 shiftStatus:
+ *                   type: string
+ *                 clockInTimestamp:
+ *                   type: integer
+ *                 clockOutTimestamp:
+ *                   type: integer
+ *                 totalHoursComputed:
+ *                   type: number
+ *       404:
+ *         description: No attendance record found for today
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Insufficient permissions
+ *       500:
+ *         description: Server error
+ */
+router.get("/employee/:employeeId/today", getTodayAttendanceByEmployee);
 
 export default router;

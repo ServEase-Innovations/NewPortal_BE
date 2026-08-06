@@ -42,3 +42,43 @@ export const deleteAttendanceService = async (id: bigint) => {
     },
   });
 };
+
+// Get attendance records for a specific employee
+export const getAttendanceByEmployeeService = async (employeeId: bigint) => {
+  return prisma.attendance.findMany({
+    where: {
+      employeeId: employeeId,
+    },
+    include: {
+      employee: true,
+    },
+    orderBy: {
+      calendarDate: 'desc',
+    },
+  });
+};
+
+// Get today's attendance for a specific employee
+export const getTodayAttendanceService = async (employeeId: bigint) => {
+  // Get today's date boundaries in epoch milliseconds
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStart = BigInt(today.getTime());
+  
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  const todayEndMs = BigInt(todayEnd.getTime());
+
+  return prisma.attendance.findFirst({
+    where: {
+      employeeId: employeeId,
+      calendarDate: {
+        gte: todayStart,
+        lte: todayEndMs,
+      },
+    },
+    include: {
+      employee: true,
+    },
+  });
+};

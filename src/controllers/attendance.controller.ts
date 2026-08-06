@@ -5,6 +5,8 @@ import {
   getAttendanceByIdService,
   updateAttendanceService,
   deleteAttendanceService,
+  getAttendanceByEmployeeService,
+  getTodayAttendanceService,
 } from "../services/attendance.service";
 
 import { createAttendanceSchema, updateAttendanceSchema } from "../validations/attendance.validation";
@@ -221,6 +223,52 @@ export const deleteAttendance = async (
     });
   } catch (error: any) {
     console.error(error);
+
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+// Get attendance records for a specific employee
+export const getAttendanceByEmployee = async (
+  req: Request<{ employeeId: string }>,
+  res: Response
+) => {
+  try {
+    const employeeId = BigInt(req.params.employeeId);
+    const attendance = await getAttendanceByEmployeeService(employeeId);
+
+    res.json(
+      attendance.map((item: any) => serializeAttendance(item))
+    );
+  } catch (error: any) {
+    console.error("Get attendance by employee error:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+// Get today's attendance for a specific employee
+export const getTodayAttendanceByEmployee = async (
+  req: Request<{ employeeId: string }>,
+  res: Response
+) => {
+  try {
+    const employeeId = BigInt(req.params.employeeId);
+    const attendance = await getTodayAttendanceService(employeeId);
+
+    if (!attendance) {
+      return res.status(404).json({
+        message: "No attendance record found for today",
+      });
+    }
+
+    res.json(serializeAttendance(attendance));
+  } catch (error: any) {
+    console.error("Get today attendance error:", error);
 
     res.status(500).json({
       message: error.message,
