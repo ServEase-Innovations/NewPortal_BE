@@ -52,14 +52,17 @@ export const createAttendance = async (
 
     const data = result.data;
 
-    // Prepare type-safe DTO
+    // Prepare type-safe DTO - IGNORE client-provided totalHoursComputed
     const attendanceData = {
       employeeId: BigInt(data.employeeId),
       calendarDate: BigInt(data.calendarDate),
       shiftStatus: data.shiftStatus as AttendanceStatus,
       clockInTimestamp: data.clockInTimestamp ? BigInt(data.clockInTimestamp) : undefined,
       clockOutTimestamp: data.clockOutTimestamp ? BigInt(data.clockOutTimestamp) : undefined,
-      totalHoursComputed: data.totalHoursComputed,
+      // Server calculates totalHoursComputed if both timestamps provided
+      totalHoursComputed: (data.clockInTimestamp && data.clockOutTimestamp) 
+        ? (data.clockOutTimestamp - data.clockInTimestamp) / (1000 * 60 * 60)
+        : undefined,
     };
 
     const attendance = await createAttendanceService(attendanceData);
@@ -176,6 +179,21 @@ export const updateAttendance = async (
       updateData.clockOutTimestamp = null;
     } else if (data.clockOutTimestamp) {
       updateData.clockOutTimestamp = BigInt(data.clockOutTimestamp);
+      
+      // VALIDATION: If providing clockOut, must have clockIn (either from update or existing record)
+      const effectiveClockIn = updateData.clockInTimestamp || existingAttendance.clockInTimestamp;
+      if (!effectiveClockIn) {
+        return res.status(400).json({
+          message: "Cannot set clock-out time without a clock-in time. Provide clockInTimestamp or ensure existing record has one.",
+        });
+      }
+      
+      // Validate order: clockOut must be after clockIn
+      if (updateData.clockOutTimestamp <= effectiveClockIn) {
+        return res.status(400).json({
+          message: "Clock-out time must be after clock-in time",
+        });
+      }
     }
 
     // CRITICAL: Calculate hours ONLY when stopping work (clockOut provided and not null)
