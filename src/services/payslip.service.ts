@@ -1,12 +1,12 @@
 import {
   AttendanceStatus,
-  PayrollRunStatus,
   PayslipStatus,
   Prisma,
 } from "@prisma/client";
 
 import prisma from "../prisma";
 import type { UpdatePayslipInput } from "../validations/payslip.validation";
+import { dateOnlyToEpoch } from "../utils/epoch";
 
 const payslipInclude = {
   employee: {
@@ -51,30 +51,6 @@ const payslipInclude = {
   },
 } satisfies Prisma.PayslipInclude;
 
-const payrollRunInclude = {
-  createdBy: {
-    select: {
-      employeeId: true,
-      fullName: true,
-      assignedRole: true,
-    },
-  },
-  approvedBy: {
-    select: {
-      employeeId: true,
-      fullName: true,
-      assignedRole: true,
-    },
-  },
-  payslips: {
-    orderBy: { employeeNameSnapshot: "asc" as const },
-    include: {
-      earnings: { orderBy: { payslipEarningId: "asc" as const } },
-      deductions: { orderBy: { payslipDeductionId: "asc" as const } },
-    },
-  },
-} satisfies Prisma.PayrollRunInclude;
-
 type MoneyInput = string | number | Prisma.Decimal;
 
 interface LineItemInput {
@@ -82,11 +58,6 @@ interface LineItemInput {
   description?: string | null;
   amount: Prisma.Decimal;
   isTaxable?: boolean;
-}
-
-export interface PayrollRunFilters {
-  year?: number;
-  status?: PayrollRunStatus;
 }
 
 export interface PayslipFilters {
@@ -154,85 +125,161 @@ const auditSnapshot = (payslip: any): Prisma.InputJsonObject => ({
   bankAccountMasked: payslip.bankAccountMasked ?? null,
 });
 
-export const createPayrollRunService = async (data: {
-  payrollMonth: number;
-  payrollYear: number;
-  currency: string;
-  createdById: bigint;
-  timestamp: bigint;
-}) => {
-  const period = getPayrollPeriod(data.payrollYear, data.payrollMonth);
+/**
+ * Computes the earning/deduction line items and totals for one employee
+ * over a given (possibly prorated) period.
+ */
+const buildEmployeePayslipFigures = (
+  employee: {
+    baseSalary: MoneyInput;
+    allowances: MoneyInput;
+    deductions: MoneyInput;
+    attendance: { shiftStatus: AttendanceStatus }[];
+  },
+  workingDays: number
+) => {
+  const absentDays = Math.min(
+    employee.attendance.filter(
+      (attendance) => attendance.shiftStatus === AttendanceStatus.Absent
+    ).length,
+    workingDays
+  );
+  const payableDays = Math.max(workingDays - absentDays, 0);
+  const baseSalary = toMoney(employee.baseSalary);
+  const allowances = toMoney(employee.allowances);
+  const fixedDeductions = toMoney(employee.deductions);
+  const unpaidLeaveDeduction =
+    workingDays > 0
+      ? baseSalary.dividedBy(workingDays).times(absentDays).toDecimalPlaces(2)
+      : new Prisma.Decimal(0);
 
-  return prisma.payrollRun.create({
-    data: {
-      payrollMonth: data.payrollMonth,
-      payrollYear: data.payrollYear,
-      ...period,
-      currency: data.currency,
-      createdById: data.createdById,
-      createdAt: data.timestamp,
-      updatedAt: data.timestamp,
+  const earnings: LineItemInput[] = [
+    {
+      type: "Basic Salary",
+      description: "Monthly base salary",
+      amount: baseSalary,
+      isTaxable: true,
     },
-    include: payrollRunInclude,
-  });
+  ];
+
+  if (allowances.greaterThan(0)) {
+    earnings.push({
+      type: "Allowances",
+      description: "Employee allowance snapshot",
+      amount: allowances,
+      isTaxable: true,
+    });
+  }
+
+  const deductions: LineItemInput[] = [];
+  if (fixedDeductions.greaterThan(0)) {
+    deductions.push({
+      type: "Standard Deductions",
+      description: "Employee deduction snapshot",
+      amount: fixedDeductions,
+    });
+  }
+  if (unpaidLeaveDeduction.greaterThan(0)) {
+    deductions.push({
+      type: "Unpaid Leave",
+      description: `${absentDays} absent working day(s)`,
+      amount: unpaidLeaveDeduction,
+    });
+  }
+
+  const totalEarnings = sumMoney(earnings);
+  const totalDeductions = sumMoney(deductions);
+  const netSalary = totalEarnings.minus(totalDeductions).toDecimalPlaces(2);
+
+  return {
+    absentDays,
+    payableDays,
+    baseSalary,
+    allowances,
+    fixedDeductions,
+    earnings,
+    deductions,
+    totalEarnings,
+    totalDeductions,
+    netSalary,
+  };
 };
 
-export const getPayrollRunsService = (filters: PayrollRunFilters = {}) =>
-  prisma.payrollRun.findMany({
-    where: {
-      payrollYear: filters.year,
-      status: filters.status,
-    },
-    include: {
-      createdBy: {
-        select: { employeeId: true, fullName: true },
-      },
-      approvedBy: {
-        select: { employeeId: true, fullName: true },
-      },
-      _count: { select: { payslips: true } },
-    },
-    orderBy: [{ payrollYear: "desc" }, { payrollMonth: "desc" }],
-  });
-
-export const getPayrollRunByIdService = (payrollRunId: bigint) =>
-  prisma.payrollRun.findUnique({
-    where: { payrollRunId },
-    include: payrollRunInclude,
-  });
-
-export const generatePayslipsService = async (data: {
-  payrollRunId: bigint;
-  employeeIds?: bigint[];
+/**
+ * Generates a single employee's payslip identified only by employeeId,
+ * date, month and year. Finds (or creates) the payroll run for the
+ * requested month/year automatically.
+ *
+ * Unlike the bulk generator's original behavior, this is deliberately
+ * allowed regardless of the payroll run's status - including Approved or
+ * Paid - so a payslip can always be generated for a new employee without
+ * hitting a run-status conflict error. If `date` falls after the run's
+ * period start (e.g. the employee's joining date), the payable period is
+ * prorated from that date through the end of the payroll period.
+ *
+ * SuperAdmin/Manager may call this repeatedly (for the same or different
+ * employees) with no artificial "one-shot" restriction.
+ */
+export const generatePayslipForEmployeeService = async (data: {
+  employeeId: bigint;
+  date: string;
+  month: number;
+  year: number;
   performedById: bigint;
   timestamp: bigint;
 }) => {
-  await prisma.$transaction(async (transaction) => {
-    const payrollRun = await transaction.payrollRun.findUnique({
-      where: { payrollRunId: data.payrollRunId },
+  const dateEpoch = dateOnlyToEpoch(data.date);
+
+  const payslip = await prisma.$transaction(async (transaction) => {
+    let payrollRun = await transaction.payrollRun.findUnique({
+      where: {
+        unique_payroll_month_year: {
+          payrollMonth: data.month,
+          payrollYear: data.year,
+        },
+      },
     });
 
     if (!payrollRun) {
-      throw new PayrollDomainError("Payroll run not found", 404);
+      const period = getPayrollPeriod(data.year, data.month);
+      payrollRun = await transaction.payrollRun.create({
+        data: {
+          payrollMonth: data.month,
+          payrollYear: data.year,
+          ...period,
+          createdById: data.performedById,
+          createdAt: data.timestamp,
+          updatedAt: data.timestamp,
+        },
+      });
     }
 
-    if (payrollRun.status !== PayrollRunStatus.Draft) {
+    if (dateEpoch > payrollRun.periodEnd) {
       throw new PayrollDomainError(
-        "Payslips can only be generated while the payroll run is Draft",
+        "The provided date falls after the payroll period end",
+        400
+      );
+    }
+
+    const existing = await transaction.payslip.findUnique({
+      where: {
+        unique_employee_payroll_run: {
+          payrollRunId: payrollRun.payrollRunId,
+          employeeId: data.employeeId,
+        },
+      },
+      select: { payslipId: true },
+    });
+
+    if (existing) {
+      throw new PayrollDomainError(
+        "A payslip already exists for this employee in the selected period",
         409
       );
     }
 
-    await transaction.payrollRun.update({
-      where: { payrollRunId: data.payrollRunId },
-      data: { status: PayrollRunStatus.Processing, updatedAt: data.timestamp },
-    });
-
-    const employees = await transaction.employee.findMany({
-      where: {
-        isActive: true,
-        employeeId: data.employeeIds ? { in: data.employeeIds } : undefined,
-      },
+    const employee = await transaction.employee.findFirst({
+      where: { employeeId: data.employeeId, isActive: true },
       select: {
         employeeId: true,
         fullName: true,
@@ -242,292 +289,127 @@ export const generatePayslipsService = async (data: {
         baseSalary: true,
         allowances: true,
         deductions: true,
-        attendance: {
-          where: {
-            calendarDate: {
-              gte: payrollRun.periodStart,
-              lte: payrollRun.periodEnd,
-            },
-          },
-          select: { shiftStatus: true },
-        },
       },
-      orderBy: { employeeId: "asc" },
     });
 
-    if (data.employeeIds) {
-      const foundIds = new Set(employees.map((employee) => employee.employeeId.toString()));
-      const missingIds = data.employeeIds.filter((id) => !foundIds.has(id.toString()));
-      if (missingIds.length > 0) {
-        throw new PayrollDomainError(
-          `Active employees not found: ${missingIds.join(", ")}`,
-          404
-        );
-      }
+    if (!employee) {
+      throw new PayrollDomainError("Active employee not found", 404);
     }
 
-    if (employees.length === 0) {
-      throw new PayrollDomainError("No active employees were found for payroll", 404);
-    }
+    const effectivePeriodStart =
+      dateEpoch > payrollRun.periodStart ? dateEpoch : payrollRun.periodStart;
 
-    const existingPayslips = await transaction.payslip.findMany({
+    const attendance = await transaction.attendance.findMany({
       where: {
-        payrollRunId: data.payrollRunId,
-        employeeId: { in: employees.map((employee) => employee.employeeId) },
+        employeeId: data.employeeId,
+        calendarDate: { gte: effectivePeriodStart, lte: payrollRun.periodEnd },
       },
-      select: { employeeId: true },
+      select: { shiftStatus: true },
     });
-    const existingEmployeeIds = new Set(
-      existingPayslips.map((payslip) => payslip.employeeId.toString())
-    );
 
-    const workingDays = countBusinessDays(
-      payrollRun.periodStart,
-      payrollRun.periodEnd
-    );
+    const workingDays = countBusinessDays(effectivePeriodStart, payrollRun.periodEnd);
 
-    for (const employee of employees) {
-      if (existingEmployeeIds.has(employee.employeeId.toString())) continue;
+    const {
+      absentDays,
+      payableDays,
+      baseSalary,
+      allowances,
+      fixedDeductions,
+      earnings,
+      deductions,
+      totalEarnings,
+      totalDeductions,
+      netSalary,
+    } = buildEmployeePayslipFigures({ ...employee, attendance }, workingDays);
 
-      const absentDays = Math.min(
-        employee.attendance.filter(
-          (attendance) => attendance.shiftStatus === AttendanceStatus.Absent
-        ).length,
-        workingDays
+    if (netSalary.lessThan(0)) {
+      throw new PayrollDomainError(
+        `Deductions exceed earnings for employee ${employee.employeeId}`,
+        400
       );
-      const payableDays = Math.max(workingDays - absentDays, 0);
-      const baseSalary = toMoney(employee.baseSalary);
-      const allowances = toMoney(employee.allowances);
-      const fixedDeductions = toMoney(employee.deductions);
-      const unpaidLeaveDeduction =
-        workingDays > 0
-          ? baseSalary.dividedBy(workingDays).times(absentDays).toDecimalPlaces(2)
-          : new Prisma.Decimal(0);
+    }
 
-      const earnings: LineItemInput[] = [
-        {
-          type: "Basic Salary",
-          description: "Monthly base salary",
-          amount: baseSalary,
-          isTaxable: true,
+    const created = await transaction.payslip.create({
+      data: {
+        payrollRunId: payrollRun.payrollRunId,
+        employeeId: employee.employeeId,
+        payslipNumber: payslipNumberFor(
+          payrollRun.payrollYear,
+          payrollRun.payrollMonth,
+          employee.employeeId
+        ),
+        employeeNameSnapshot: employee.fullName,
+        employeeEmailSnapshot: employee.emailAddress,
+        employeeRoleSnapshot: employee.assignedRole,
+        employeeDepartmentSnapshot: employee.assignedDepartment,
+        currency: payrollRun.currency,
+        workingDays: toDayDecimal(workingDays),
+        payableDays: toDayDecimal(payableDays),
+        unpaidLeaveDays: toDayDecimal(absentDays),
+        baseSalarySnapshot: baseSalary,
+        allowanceSnapshot: allowances,
+        deductionSnapshot: fixedDeductions,
+        totalEarnings,
+        totalDeductions,
+        netSalary,
+        generatedAt: data.timestamp,
+        updatedAt: data.timestamp,
+        earnings: {
+          create: earnings.map((earning) => ({
+            earningType: earning.type,
+            description: earning.description,
+            amount: earning.amount,
+            isTaxable: earning.isTaxable ?? true,
+            createdAt: data.timestamp,
+          })),
         },
-      ];
-
-      if (allowances.greaterThan(0)) {
-        earnings.push({
-          type: "Allowances",
-          description: "Employee allowance snapshot",
-          amount: allowances,
-          isTaxable: true,
-        });
-      }
-
-      const deductions: LineItemInput[] = [];
-      if (fixedDeductions.greaterThan(0)) {
-        deductions.push({
-          type: "Standard Deductions",
-          description: "Employee deduction snapshot",
-          amount: fixedDeductions,
-        });
-      }
-      if (unpaidLeaveDeduction.greaterThan(0)) {
-        deductions.push({
-          type: "Unpaid Leave",
-          description: `${absentDays} absent working day(s)`,
-          amount: unpaidLeaveDeduction,
-        });
-      }
-
-      const totalEarnings = sumMoney(earnings);
-      const totalDeductions = sumMoney(deductions);
-      const netSalary = totalEarnings.minus(totalDeductions).toDecimalPlaces(2);
-
-      if (netSalary.lessThan(0)) {
-        throw new PayrollDomainError(
-          `Deductions exceed earnings for employee ${employee.employeeId}`,
-          400
-        );
-      }
-
-      await transaction.payslip.create({
-        data: {
-          payrollRunId: payrollRun.payrollRunId,
-          employeeId: employee.employeeId,
-          payslipNumber: payslipNumberFor(
-            payrollRun.payrollYear,
-            payrollRun.payrollMonth,
-            employee.employeeId
-          ),
-          employeeNameSnapshot: employee.fullName,
-          employeeEmailSnapshot: employee.emailAddress,
-          employeeRoleSnapshot: employee.assignedRole,
-          employeeDepartmentSnapshot: employee.assignedDepartment,
-          currency: payrollRun.currency,
-          workingDays: toDayDecimal(workingDays),
-          payableDays: toDayDecimal(payableDays),
-          unpaidLeaveDays: toDayDecimal(absentDays),
-          baseSalarySnapshot: baseSalary,
-          allowanceSnapshot: allowances,
-          deductionSnapshot: fixedDeductions,
-          totalEarnings,
-          totalDeductions,
-          netSalary,
-          generatedAt: data.timestamp,
-          updatedAt: data.timestamp,
-          earnings: {
-            create: earnings.map((earning) => ({
-              earningType: earning.type,
-              description: earning.description,
-              amount: earning.amount,
-              isTaxable: earning.isTaxable ?? true,
-              createdAt: data.timestamp,
-            })),
-          },
-          deductions: {
-            create: deductions.map((deduction) => ({
-              deductionType: deduction.type,
-              description: deduction.description,
-              amount: deduction.amount,
-              createdAt: data.timestamp,
-            })),
-          },
-          auditLogs: {
-            create: {
-              action: "Generated",
-              performedById: data.performedById,
-              updatedData: {
-                status: PayslipStatus.Draft,
-                totalEarnings: totalEarnings.toFixed(2),
-                totalDeductions: totalDeductions.toFixed(2),
-                netSalary: netSalary.toFixed(2),
-              },
-              createdAt: data.timestamp,
+        deductions: {
+          create: deductions.map((deduction) => ({
+            deductionType: deduction.type,
+            description: deduction.description,
+            amount: deduction.amount,
+            createdAt: data.timestamp,
+          })),
+        },
+        auditLogs: {
+          create: {
+            action: "Generated",
+            performedById: data.performedById,
+            updatedData: {
+              status: PayslipStatus.Draft,
+              totalEarnings: totalEarnings.toFixed(2),
+              totalDeductions: totalDeductions.toFixed(2),
+              netSalary: netSalary.toFixed(2),
+              effectivePeriodStart: effectivePeriodStart.toString(),
             },
+            createdAt: data.timestamp,
           },
         },
-      });
-    }
-
-    await transaction.payrollRun.update({
-      where: { payrollRunId: data.payrollRunId },
-      data: { status: PayrollRunStatus.Draft, updatedAt: data.timestamp },
+      },
     });
+
+    return created;
   });
 
-  return getPayrollRunByIdService(data.payrollRunId);
+  return getPayslipByIdService(payslip.payslipId);
 };
 
-export const approvePayrollRunService = async (data: {
-  payrollRunId: bigint;
-  approvedById: bigint;
-  timestamp: bigint;
-}) => {
-  await prisma.$transaction(async (transaction) => {
-    const payrollRun = await transaction.payrollRun.findUnique({
-      where: { payrollRunId: data.payrollRunId },
-      include: { payslips: { select: { payslipId: true, status: true } } },
-    });
-
-    if (!payrollRun) throw new PayrollDomainError("Payroll run not found", 404);
-    if (payrollRun.status !== PayrollRunStatus.Draft) {
-      throw new PayrollDomainError("Only a Draft payroll run can be approved", 409);
-    }
-    if (payrollRun.payslips.length === 0) {
-      throw new PayrollDomainError("Generate at least one payslip before approval", 409);
-    }
-    if (payrollRun.payslips.some((payslip) => payslip.status !== PayslipStatus.Draft)) {
-      throw new PayrollDomainError("Every payslip must be Draft before approval", 409);
-    }
-
-    await transaction.payslip.updateMany({
-      where: { payrollRunId: data.payrollRunId, status: PayslipStatus.Draft },
-      data: {
-        status: PayslipStatus.Approved,
-        approvedAt: data.timestamp,
-        approvedById: data.approvedById,
-        updatedAt: data.timestamp,
-      },
-    });
-
-    await transaction.payslipAuditLog.createMany({
-      data: payrollRun.payslips.map((payslip) => ({
-        payslipId: payslip.payslipId,
-        action: "Approved",
-        performedById: data.approvedById,
-        previousData: { status: PayslipStatus.Draft },
-        updatedData: { status: PayslipStatus.Approved },
-        createdAt: data.timestamp,
-      })),
-    });
-
-    await transaction.payrollRun.update({
-      where: { payrollRunId: data.payrollRunId },
-      data: {
-        status: PayrollRunStatus.Approved,
-        approvedById: data.approvedById,
-        approvedAt: data.timestamp,
-        updatedAt: data.timestamp,
-      },
-    });
+/**
+ * Looks up a single payslip using employeeId + month + year only -
+ * the internal payslipId is never required by the caller.
+ */
+export const getPayslipByEmployeePeriodService = (
+  employeeId: bigint,
+  month: number,
+  year: number
+) =>
+  prisma.payslip.findFirst({
+    where: {
+      employeeId,
+      payrollRun: { payrollMonth: month, payrollYear: year },
+    },
+    include: payslipInclude,
   });
-
-  return getPayrollRunByIdService(data.payrollRunId);
-};
-
-export const markPayrollRunPaidService = async (data: {
-  payrollRunId: bigint;
-  paidById: bigint;
-  paymentReference?: string;
-  timestamp: bigint;
-}) => {
-  await prisma.$transaction(async (transaction) => {
-    const payrollRun = await transaction.payrollRun.findUnique({
-      where: { payrollRunId: data.payrollRunId },
-      include: { payslips: { select: { payslipId: true, status: true } } },
-    });
-
-    if (!payrollRun) throw new PayrollDomainError("Payroll run not found", 404);
-    if (payrollRun.status !== PayrollRunStatus.Approved) {
-      throw new PayrollDomainError("Only an Approved payroll run can be marked paid", 409);
-    }
-
-    await transaction.payslip.updateMany({
-      where: { payrollRunId: data.payrollRunId, status: PayslipStatus.Approved },
-      data: {
-        status: PayslipStatus.Paid,
-        paidAt: data.timestamp,
-        paidById: data.paidById,
-        paymentReference: data.paymentReference,
-        updatedAt: data.timestamp,
-      },
-    });
-
-    await transaction.payslipAuditLog.createMany({
-      data: payrollRun.payslips.map((payslip) => ({
-        payslipId: payslip.payslipId,
-        action: "MarkedPaid",
-        performedById: data.paidById,
-        previousData: { status: payslip.status },
-        updatedData: {
-          status: PayslipStatus.Paid,
-          paymentReference: data.paymentReference ?? null,
-        },
-        createdAt: data.timestamp,
-      })),
-    });
-
-    await transaction.payrollRun.update({
-      where: { payrollRunId: data.payrollRunId },
-      data: {
-        status: PayrollRunStatus.Paid,
-        paidAt: data.timestamp,
-        updatedAt: data.timestamp,
-      },
-    });
-  });
-
-  return getPayrollRunByIdService(data.payrollRunId);
-};
 
 export const getPayslipsService = (filters: PayslipFilters = {}) => {
   const where: Prisma.PayslipWhereInput = {
@@ -554,6 +436,42 @@ export const getPayslipByIdService = (payslipId: bigint) =>
     where: { payslipId },
     include: payslipInclude,
   });
+
+/**
+ * Resolves employeeId + month/year to the underlying payslipId and then
+ * applies the same update logic as updateDraftPayslipService. Keeps
+ * employeeId as the only identifier callers ever need to supply.
+ */
+export const updateDraftPayslipByEmployeeService = async (data: {
+  employeeId: bigint;
+  month: number;
+  year: number;
+  changes: UpdatePayslipInput;
+  performedById: bigint;
+  timestamp: bigint;
+}) => {
+  const existing = await prisma.payslip.findFirst({
+    where: {
+      employeeId: data.employeeId,
+      payrollRun: { payrollMonth: data.month, payrollYear: data.year },
+    },
+    select: { payslipId: true },
+  });
+
+  if (!existing) {
+    throw new PayrollDomainError(
+      "No payslip found for this employee in the selected period",
+      404
+    );
+  }
+
+  return updateDraftPayslipService({
+    payslipId: existing.payslipId,
+    changes: data.changes,
+    performedById: data.performedById,
+    timestamp: data.timestamp,
+  });
+};
 
 export const updateDraftPayslipService = async (data: {
   payslipId: bigint;
