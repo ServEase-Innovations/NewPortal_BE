@@ -27,7 +27,7 @@ export const updateAttendanceSchema = z.object({
 
   clockInTimestamp: z.number().int().positive().optional(),
 
-  clockOutTimestamp: z.number().int().positive().optional(),
+  clockOutTimestamp: z.number().int().positive().nullable().optional(),
 
   totalHoursComputed: z.number().min(0).optional(),
 });
