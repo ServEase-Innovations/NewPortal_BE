@@ -155,13 +155,17 @@ export const updateAttendance = async (
       updateData.clockInTimestamp = BigInt(updateData.clockInTimestamp);
     }
 
-    if (updateData.clockOutTimestamp) {
+    // Handle clockOutTimestamp - can be null (resume work), undefined (not provided), or a timestamp
+    if (updateData.clockOutTimestamp === null) {
+      // Explicitly setting to null to resume work
+      updateData.clockOutTimestamp = null;
+    } else if (updateData.clockOutTimestamp) {
       updateData.clockOutTimestamp = BigInt(updateData.clockOutTimestamp);
     }
 
-    // Auto-calculate totalHoursComputed if timestamps are involved
-    if (updateData.clockInTimestamp || updateData.clockOutTimestamp) {
-      // Fetch existing record to get the other timestamp if only one is provided
+    // Auto-calculate totalHoursComputed if we're stopping work (clockOut is provided and not null)
+    if (updateData.clockOutTimestamp && updateData.clockOutTimestamp !== null) {
+      // Fetch existing record to get the clock-in timestamp
       const existingAttendance = await getAttendanceByIdService(
         BigInt(req.params.id)
       );
@@ -174,7 +178,7 @@ export const updateAttendance = async (
 
       // Get clock-in and clock-out epoch times
       const clockInEpoch = updateData.clockInTimestamp || existingAttendance.clockInTimestamp;
-      const clockOutEpoch = updateData.clockOutTimestamp || existingAttendance.clockOutTimestamp;
+      const clockOutEpoch = updateData.clockOutTimestamp;
 
       // Calculate hours if both timestamps are available
       if (clockInEpoch && clockOutEpoch) {
@@ -185,9 +189,16 @@ export const updateAttendance = async (
         const diffInMs = clockOutMs - clockInMs;
         const diffInHours = diffInMs / (1000 * 60 * 60);
         
-        // Round to 2 decimal places and ensure it's within reasonable bounds
-        const calculatedHours = Math.max(0, Math.min(999.99, Math.round(diffInHours * 100) / 100));
-        updateData.totalHoursComputed = calculatedHours;
+        // Get previous accumulated hours (if any)
+        const previousHours = updateData.totalHoursComputed !== undefined 
+          ? updateData.totalHoursComputed 
+          : Number(existingAttendance.totalHoursComputed) || 0;
+        
+        // Add current session hours to previous hours
+        const totalHours = Math.max(0, Math.min(999.99, Math.round((previousHours + diffInHours) * 100) / 100));
+        updateData.totalHoursComputed = totalHours;
+        
+        console.log(`⏸️ Stopping work - Session: ${diffInHours.toFixed(2)}h + Previous: ${previousHours.toFixed(2)}h = Total: ${totalHours.toFixed(2)}h`);
       }
     }
 
