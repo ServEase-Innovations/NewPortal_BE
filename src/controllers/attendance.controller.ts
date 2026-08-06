@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { AttendanceStatus } from "@prisma/client";
 import {
   createAttendanceService,
   getAttendanceService,
@@ -49,28 +50,19 @@ export const createAttendance = async (
       });
     }
 
-    const data: any = { ...result.data };
+    const data = result.data;
 
-    // Convert employeeId string to BigInt
-    if (data.employeeId) {
-      data.employeeId = BigInt(data.employeeId);
-    }
+    // Prepare type-safe DTO
+    const attendanceData = {
+      employeeId: BigInt(data.employeeId),
+      calendarDate: BigInt(data.calendarDate),
+      shiftStatus: data.shiftStatus as AttendanceStatus,
+      clockInTimestamp: data.clockInTimestamp ? BigInt(data.clockInTimestamp) : undefined,
+      clockOutTimestamp: data.clockOutTimestamp ? BigInt(data.clockOutTimestamp) : undefined,
+      totalHoursComputed: data.totalHoursComputed,
+    };
 
-    // Convert epoch number to BigInt (already in milliseconds)
-    if (data.calendarDate) {
-      data.calendarDate = BigInt(data.calendarDate);
-    }
-
-    // Convert epoch numbers to BigInt
-    if (data.clockInTimestamp) {
-      data.clockInTimestamp = BigInt(data.clockInTimestamp);
-    }
-
-    if (data.clockOutTimestamp) {
-      data.clockOutTimestamp = BigInt(data.clockOutTimestamp);
-    }
-
-    const attendance = await createAttendanceService(data);
+    const attendance = await createAttendanceService(attendanceData);
 
     res.status(201).json(
       serializeAttendance(attendance)
@@ -159,19 +151,31 @@ export const updateAttendance = async (
       });
     }
 
-    const updateData: any = { ...result.data };
+    const data = result.data;
+
+    // Prepare type-safe update DTO
+    const updateData: {
+      shiftStatus?: AttendanceStatus;
+      clockInTimestamp?: bigint | null;
+      clockOutTimestamp?: bigint | null;
+      totalHoursComputed?: number;
+    } = {};
+
+    if (data.shiftStatus) {
+      updateData.shiftStatus = data.shiftStatus as AttendanceStatus;
+    }
 
     // Convert epoch numbers to BigInt
-    if (updateData.clockInTimestamp) {
-      updateData.clockInTimestamp = BigInt(updateData.clockInTimestamp);
+    if (data.clockInTimestamp) {
+      updateData.clockInTimestamp = BigInt(data.clockInTimestamp);
     }
 
     // Handle clockOutTimestamp - can be null (resume work), undefined (not provided), or a timestamp
-    if (updateData.clockOutTimestamp === null) {
+    if (data.clockOutTimestamp === null) {
       // Explicitly setting to null to resume work
       updateData.clockOutTimestamp = null;
-    } else if (updateData.clockOutTimestamp) {
-      updateData.clockOutTimestamp = BigInt(updateData.clockOutTimestamp);
+    } else if (data.clockOutTimestamp) {
+      updateData.clockOutTimestamp = BigInt(data.clockOutTimestamp);
     }
 
     // CRITICAL: Calculate hours ONLY when stopping work (clockOut provided and not null)

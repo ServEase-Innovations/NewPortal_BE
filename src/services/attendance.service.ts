@@ -1,13 +1,76 @@
 import prisma from "../prisma";
+import { Prisma, AttendanceStatus } from "@prisma/client";
 
-export const createAttendanceService = async (data: any) => {
-  return prisma.attendance.create({ data });
+// Type-safe DTOs for attendance operations
+type CreateAttendanceDTO = {
+  employeeId: bigint;
+  calendarDate: bigint;
+  shiftStatus: AttendanceStatus;
+  clockInTimestamp?: bigint | null;
+  clockOutTimestamp?: bigint | null;
+  totalHoursComputed?: number;
+};
+
+type UpdateAttendanceDTO = {
+  shiftStatus?: AttendanceStatus;
+  clockInTimestamp?: bigint | null;
+  clockOutTimestamp?: bigint | null;
+  totalHoursComputed?: number;
+};
+
+// Whitelisted employee fields for safe inclusion
+const safeEmployeeSelect = {
+  employeeId: true,
+  username: true,
+  firstName: true,
+  lastName: true,
+  emailAddress: true,
+  assignedRole: true,
+  joinedAt: true,
+  // Exclude sensitive fields: password_hash, last_login, etc.
+};
+
+export const createAttendanceService = async (data: CreateAttendanceDTO) => {
+  // Explicitly whitelist fields to prevent mass assignment vulnerabilities
+  const whitelistedData: Prisma.AttendanceUncheckedCreateInput = {
+    employeeId: data.employeeId,
+    calendarDate: data.calendarDate,
+    shiftStatus: data.shiftStatus,
+    clockInTimestamp: data.clockInTimestamp,
+    clockOutTimestamp: data.clockOutTimestamp,
+    totalHoursComputed: data.totalHoursComputed,
+  };
+
+  return prisma.attendance.create({ 
+    data: whitelistedData,
+    select: {
+      attendanceId: true,
+      employeeId: true,
+      calendarDate: true,
+      shiftStatus: true,
+      clockInTimestamp: true,
+      clockOutTimestamp: true,
+      totalHoursComputed: true,
+      employee: {
+        select: safeEmployeeSelect,
+      },
+    },
+  });
 };
 
 export const getAttendanceService = async () => {
   return prisma.attendance.findMany({
-    include: {
-      employee: true,
+    select: {
+      attendanceId: true,
+      employeeId: true,
+      calendarDate: true,
+      shiftStatus: true,
+      clockInTimestamp: true,
+      clockOutTimestamp: true,
+      totalHoursComputed: true,
+      employee: {
+        select: safeEmployeeSelect,
+      },
     },
   });
 };
@@ -17,21 +80,58 @@ export const getAttendanceByIdService = async (id: bigint) => {
     where: {
       attendanceId: id,
     },
-    include: {
-      employee: true,
+    select: {
+      attendanceId: true,
+      employeeId: true,
+      calendarDate: true,
+      shiftStatus: true,
+      clockInTimestamp: true,
+      clockOutTimestamp: true,
+      totalHoursComputed: true,
+      employee: {
+        select: safeEmployeeSelect,
+      },
     },
   });
 };
 
 export const updateAttendanceService = async (
   id: bigint,
-  data: any
+  data: UpdateAttendanceDTO
 ) => {
+  // Explicitly whitelist updatable fields to prevent mass assignment
+  const whitelistedData: Prisma.AttendanceUncheckedUpdateInput = {};
+  
+  if (data.shiftStatus !== undefined) {
+    whitelistedData.shiftStatus = data.shiftStatus;
+  }
+  if (data.clockInTimestamp !== undefined) {
+    whitelistedData.clockInTimestamp = data.clockInTimestamp;
+  }
+  if (data.clockOutTimestamp !== undefined) {
+    whitelistedData.clockOutTimestamp = data.clockOutTimestamp;
+  }
+  if (data.totalHoursComputed !== undefined) {
+    whitelistedData.totalHoursComputed = data.totalHoursComputed;
+  }
+
   return prisma.attendance.update({
     where: {
       attendanceId: id,
     },
-    data,
+    data: whitelistedData,
+    select: {
+      attendanceId: true,
+      employeeId: true,
+      calendarDate: true,
+      shiftStatus: true,
+      clockInTimestamp: true,
+      clockOutTimestamp: true,
+      totalHoursComputed: true,
+      employee: {
+        select: safeEmployeeSelect,
+      },
+    },
   });
 };
 
@@ -49,8 +149,17 @@ export const getAttendanceByEmployeeService = async (employeeId: bigint) => {
     where: {
       employeeId: employeeId,
     },
-    include: {
-      employee: true,
+    select: {
+      attendanceId: true,
+      employeeId: true,
+      calendarDate: true,
+      shiftStatus: true,
+      clockInTimestamp: true,
+      clockOutTimestamp: true,
+      totalHoursComputed: true,
+      employee: {
+        select: safeEmployeeSelect,
+      },
     },
     orderBy: {
       calendarDate: 'desc',
@@ -77,8 +186,20 @@ export const getTodayAttendanceService = async (employeeId: bigint) => {
         lte: todayEndMs,
       },
     },
-    include: {
-      employee: true,
+    select: {
+      attendanceId: true,
+      employeeId: true,
+      calendarDate: true,
+      shiftStatus: true,
+      clockInTimestamp: true,
+      clockOutTimestamp: true,
+      totalHoursComputed: true,
+      employee: {
+        select: safeEmployeeSelect,
+      },
+    },
+    orderBy: {
+      calendarDate: 'desc', // Deterministic ordering - most recent first
     },
   });
 };
