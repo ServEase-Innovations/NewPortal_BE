@@ -1,5 +1,4 @@
-import { Router } from "express";
-import { Request, Response, NextFunction } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { EmployeeRole } from "@prisma/client";
 
 import {
@@ -24,15 +23,15 @@ const checkEmployeeAccess = (
   
   // Handle potential array values
   const employeeIdStr = Array.isArray(employeeIdParam) ? employeeIdParam[0] : employeeIdParam;
-  const requestedEmployeeId = parseInt(employeeIdStr);
+  const requestedEmployeeId = Number.parseInt(employeeIdStr, 10);
   
-  if (isNaN(requestedEmployeeId)) {
+  if (Number.isNaN(requestedEmployeeId)) {
     return res.status(400).json({
       message: "Invalid employee ID format",
     });
   }
   
-  const currentEmployeeId = parseInt(authReq.employee!.employeeId);
+  const currentEmployeeId = Number.parseInt(authReq.employee!.employeeId, 10);
   const role = authReq.employee!.assignedRole;
 
   // Allow if:

@@ -3,8 +3,8 @@ import { z } from "zod";
 // Helper: Validate that a string is a positive integer
 const positiveIntegerString = z.string().trim().min(1, "Value is required").refine(
   (val) => {
-    const num = parseInt(val, 10);
-    return !isNaN(num) && num > 0 && Number.isInteger(num) && val === num.toString();
+    const num = Number.parseInt(val, 10);
+    return !Number.isNaN(num) && num > 0 && Number.isInteger(num) && val === num.toString();
   },
   { message: "Must be a positive integer" }
 );
