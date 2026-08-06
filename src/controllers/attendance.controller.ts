@@ -148,6 +148,17 @@ export const updateAttendance = async (
       });
     }
 
+    // Fetch existing record first - needed for all update scenarios
+    const existingAttendance = await getAttendanceByIdService(
+      BigInt(req.params.id)
+    );
+
+    if (!existingAttendance) {
+      return res.status(404).json({
+        message: "Attendance record not found",
+      });
+    }
+
     const updateData: any = { ...result.data };
 
     // Convert epoch numbers to BigInt
@@ -163,43 +174,64 @@ export const updateAttendance = async (
       updateData.clockOutTimestamp = BigInt(updateData.clockOutTimestamp);
     }
 
-    // Auto-calculate totalHoursComputed if we're stopping work (clockOut is provided and not null)
+    // CRITICAL: Calculate hours ONLY when stopping work (clockOut provided and not null)
+    // This prevents double-counting and ensures accurate time tracking
     if (updateData.clockOutTimestamp && updateData.clockOutTimestamp !== null) {
-      // Fetch existing record to get the clock-in timestamp
-      const existingAttendance = await getAttendanceByIdService(
-        BigInt(req.params.id)
-      );
+      // Use the ACTUAL clock-in from the database (not client-provided)
+      // This prevents using stale/wrong timestamps
+      const clockInEpoch = existingAttendance.clockInTimestamp;
+      const clockOutEpoch = updateData.clockOutTimestamp;
 
-      if (!existingAttendance) {
-        return res.status(404).json({
-          message: "Attendance record not found",
+      if (!clockInEpoch) {
+        return res.status(400).json({
+          message: "Cannot clock out without a clock-in time",
         });
       }
 
-      // Get clock-in and clock-out epoch times
-      const clockInEpoch = updateData.clockInTimestamp || existingAttendance.clockInTimestamp;
-      const clockOutEpoch = updateData.clockOutTimestamp;
-
-      // Calculate hours if both timestamps are available
-      if (clockInEpoch && clockOutEpoch) {
-        // Convert BigInt to number for calculation
-        const clockInMs = Number(clockInEpoch);
-        const clockOutMs = Number(clockOutEpoch);
-        
-        const diffInMs = clockOutMs - clockInMs;
-        const diffInHours = diffInMs / (1000 * 60 * 60);
-        
-        // Get previous accumulated hours (if any)
-        const previousHours = updateData.totalHoursComputed !== undefined 
-          ? updateData.totalHoursComputed 
-          : Number(existingAttendance.totalHoursComputed) || 0;
-        
-        // Add current session hours to previous hours
-        const totalHours = Math.max(0, Math.min(999.99, Math.round((previousHours + diffInHours) * 100) / 100));
-        updateData.totalHoursComputed = totalHours;
-        
-        console.log(`⏸️ Stopping work - Session: ${diffInHours.toFixed(2)}h + Previous: ${previousHours.toFixed(2)}h = Total: ${totalHours.toFixed(2)}h`);
+      // Calculate THIS session's duration
+      const clockInMs = Number(clockInEpoch);
+      const clockOutMs = Number(clockOutEpoch);
+      
+      const diffInMs = clockOutMs - clockInMs;
+      
+      // Validate: clock-out must be after clock-in
+      if (diffInMs < 0) {
+        return res.status(400).json({
+          message: "Clock-out time cannot be before clock-in time",
+        });
       }
+      
+      // Validate: session must be reasonable (not more than 24 hours)
+      if (diffInMs > 24 * 60 * 60 * 1000) {
+        return res.status(400).json({
+          message: "Session duration exceeds 24 hours",
+        });
+      }
+      
+      const sessionHours = diffInMs / (1000 * 60 * 60);
+      
+      // Get previous accumulated hours from DATABASE (NEVER trust client)
+      const previousHours = Number(existingAttendance.totalHoursComputed) || 0;
+      
+      // Add current session hours to previous hours
+      const totalHours = Math.round((previousHours + sessionHours) * 100) / 100;
+      
+      // Validate final total is reasonable (not more than 744 hours = 31 days * 24h)
+      if (totalHours > 744) {
+        return res.status(400).json({
+          message: "Total hours exceeds maximum allowed (744 hours)",
+        });
+      }
+      
+      updateData.totalHoursComputed = totalHours;
+      
+      console.log(`⏸️ Stopping work - Session: ${sessionHours.toFixed(2)}h + Previous: ${previousHours.toFixed(2)}h = Total: ${totalHours.toFixed(2)}h`);
+    }
+    
+    // If resuming work (clockOut = null), keep the previous accumulated hours
+    // DON'T let client override totalHoursComputed when resuming
+    if (updateData.clockOutTimestamp === null) {
+      delete updateData.totalHoursComputed; // Prevent client from changing accumulated hours
     }
 
     const attendance =
