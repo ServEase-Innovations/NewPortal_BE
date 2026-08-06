@@ -111,27 +111,21 @@ const router = Router();
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 attendanceId:
  *                   type: string
- *                   example: Attendance created successfully
- *                 attendance:
- *                   type: object
- *                   properties:
- *                     attendanceId:
- *                       type: string
- *                       description: Unique attendance record ID
- *                     employeeId:
- *                       type: integer
- *                     calendarDate:
- *                       type: integer
- *                     shiftStatus:
- *                       type: string
- *                     clockInTimestamp:
- *                       type: integer
- *                     clockOutTimestamp:
- *                       type: integer
- *                     totalHoursComputed:
- *                       type: number
+ *                   description: Unique attendance record ID
+ *                 employeeId:
+ *                   type: integer
+ *                 calendarDate:
+ *                   type: integer
+ *                 shiftStatus:
+ *                   type: string
+ *                 clockInTimestamp:
+ *                   type: integer
+ *                 clockOutTimestamp:
+ *                   type: integer
+ *                 totalHoursComputed:
+ *                   type: number
  *       400:
  *         description: Validation failed or invalid input
  *       401:
@@ -150,85 +144,40 @@ router.post("/", authenticate, createAttendance);
  * /attendance:
  *   get:
  *     summary: Get all attendance records
- *     description: Returns a list of all attendance records with optional filtering. Accessible by SuperAdmin, HR, and Manager.
+ *     description: Returns a list of all attendance records. Accessible by SuperAdmin, HR, and Manager.
  *     tags:
  *       - Attendance
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: employeeId
- *         schema:
- *           type: integer
- *         description: Filter by employee ID
- *         example: 1
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: integer
- *         description: Filter records from this date (epoch milliseconds)
- *         example: 1783728000000
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: integer
- *         description: Filter records until this date (epoch milliseconds)
- *         example: 1784937600000
- *       - in: query
- *         name: shiftStatus
- *         schema:
- *           type: string
- *           enum: [Working, OnLeave, Absent]
- *         description: Filter by shift status
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *         description: Page number for pagination
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *         description: Number of items per page
  *     responses:
  *       200:
  *         description: Attendance records fetched successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 attendance:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       attendanceId:
- *                         type: string
- *                       employeeId:
- *                         type: integer
- *                       calendarDate:
- *                         type: integer
- *                         description: Attendance date as epoch milliseconds
- *                       shiftStatus:
- *                         type: string
- *                       clockInTimestamp:
- *                         type: integer
- *                       clockOutTimestamp:
- *                         type: integer
- *                       totalHoursComputed:
- *                         type: number
- *                 total:
- *                   type: integer
- *                   description: Total number of records
- *                 page:
- *                   type: integer
- *                 limit:
- *                   type: integer
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   attendanceId:
+ *                     type: string
+ *                   employeeId:
+ *                     type: integer
+ *                   calendarDate:
+ *                     type: integer
+ *                     description: Attendance date as epoch milliseconds
+ *                   shiftStatus:
+ *                     type: string
+ *                   clockInTimestamp:
+ *                     type: integer
+ *                   clockOutTimestamp:
+ *                     type: integer
+ *                   totalHoursComputed:
+ *                     type: number
  *       401:
  *         description: Authentication required
  *       403:
- *         description: Insufficient permissions
+ *         description: Insufficient permissions (requires SuperAdmin, HR, or Manager role)
  *       500:
  *         description: Server error
  */
