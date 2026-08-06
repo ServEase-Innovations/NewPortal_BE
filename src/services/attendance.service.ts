@@ -19,15 +19,19 @@ type UpdateAttendanceDTO = {
 };
 
 // Whitelisted employee fields for safe inclusion
+// Based on actual Prisma schema - excludes sensitive fields like password, refresh_token, last_login
 const safeEmployeeSelect = {
   employeeId: true,
   username: true,
-  firstName: true,
-  lastName: true,
+  fullName: true,
   emailAddress: true,
   assignedRole: true,
+  assignedDepartment: true,
+  isActive: true,
   joinedAt: true,
-  // Exclude sensitive fields: password_hash, last_login, etc.
+  managerId: true,
+  teamId: true,
+  // Exclude sensitive fields: password, refresh_token, last_login, privateAdminNotes
 };
 
 export const createAttendanceService = async (data: CreateAttendanceDTO) => {
