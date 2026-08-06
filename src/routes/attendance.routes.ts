@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { Request, Response, NextFunction } from "express";
+import { EmployeeRole } from "@prisma/client";
 
 import {
   createAttendance,
@@ -9,6 +11,46 @@ import {
   getAttendanceByEmployee,
   getTodayAttendanceByEmployee,
 } from "../controllers/attendance.controller";
+import { authenticate, authorize, AuthRequest } from "../middleware/auth.middleware";
+
+// Middleware to check if user can access employee's data
+const checkEmployeeAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const authReq = req as AuthRequest;
+  const employeeIdParam = req.params.employeeId;
+  
+  // Handle potential array values
+  const employeeIdStr = Array.isArray(employeeIdParam) ? employeeIdParam[0] : employeeIdParam;
+  const requestedEmployeeId = parseInt(employeeIdStr);
+  
+  if (isNaN(requestedEmployeeId)) {
+    return res.status(400).json({
+      message: "Invalid employee ID format",
+    });
+  }
+  
+  const currentEmployeeId = parseInt(authReq.employee!.employeeId);
+  const role = authReq.employee!.assignedRole;
+
+  // Allow if:
+  // 1. User is requesting their own data
+  // 2. User is SuperAdmin, HR, or Manager (can view all employees)
+  if (
+    currentEmployeeId === requestedEmployeeId ||
+    role === EmployeeRole.SuperAdmin ||
+    role === EmployeeRole.HR ||
+    role === EmployeeRole.Manager
+  ) {
+    return next();
+  }
+
+  return res.status(403).json({
+    message: "Access denied. You can only view your own attendance records.",
+  });
+};
 
 const router = Router();
 
@@ -101,7 +143,7 @@ const router = Router();
  *       500:
  *         description: Server error
  */
-router.post("/", createAttendance);
+router.post("/", authenticate, createAttendance);
 
 /**
  * @swagger
@@ -190,7 +232,7 @@ router.post("/", createAttendance);
  *       500:
  *         description: Server error
  */
-router.get("/", getAttendance);
+router.get("/", authenticate, authorize(EmployeeRole.SuperAdmin, EmployeeRole.HR, EmployeeRole.Manager), getAttendance);
 
 /**
  * @swagger
@@ -209,7 +251,7 @@ router.get("/", getAttendance);
  *       200:
  *         description: Attendance found
  */
-router.get("/:id", getAttendanceById);
+router.get("/:id", authenticate, getAttendanceById);
 
 /**
  * @swagger
@@ -234,7 +276,7 @@ router.get("/:id", getAttendanceById);
  *       200:
  *         description: Attendance updated
  */
-router.put("/:id", updateAttendance);
+router.put("/:id", authenticate, updateAttendance);
 
 /**
  * @swagger
@@ -253,7 +295,7 @@ router.put("/:id", updateAttendance);
  *       200:
  *         description: Attendance deleted
  */
-router.delete("/:id", deleteAttendance);
+router.delete("/:id", authenticate, authorize(EmployeeRole.SuperAdmin, EmployeeRole.HR), deleteAttendance);
 
 /**
  * @swagger
@@ -305,7 +347,7 @@ router.delete("/:id", deleteAttendance);
  *       500:
  *         description: Server error
  */
-router.get("/employee/:employeeId", getAttendanceByEmployee);
+router.get("/employee/:employeeId", authenticate, checkEmployeeAccess, getAttendanceByEmployee);
 
 /**
  * @swagger
@@ -357,6 +399,6 @@ router.get("/employee/:employeeId", getAttendanceByEmployee);
  *       500:
  *         description: Server error
  */
-router.get("/employee/:employeeId/today", getTodayAttendanceByEmployee);
+router.get("/employee/:employeeId/today", authenticate, checkEmployeeAccess, getTodayAttendanceByEmployee);
 
 export default router;
