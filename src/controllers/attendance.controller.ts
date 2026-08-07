@@ -52,6 +52,21 @@ export const createAttendance = async (
 
     const data = result.data;
 
+    // Validate: If both clockIn and clockOut provided, they must be on the same calendar day
+    if (data.clockInTimestamp && data.clockOutTimestamp) {
+      const clockInDate = new Date(data.clockInTimestamp);
+      const clockOutDate = new Date(data.clockOutTimestamp);
+      
+      const clockInDay = new Date(clockInDate.getFullYear(), clockInDate.getMonth(), clockInDate.getDate());
+      const clockOutDay = new Date(clockOutDate.getFullYear(), clockOutDate.getMonth(), clockOutDate.getDate());
+      
+      if (clockOutDay.getTime() !== clockInDay.getTime()) {
+        return res.status(400).json({
+          message: "Clock-in and clock-out must be on the same calendar day. Work sessions cannot span multiple days."
+        });
+      }
+    }
+
     // Prepare type-safe DTO - IGNORE client-provided totalHoursComputed
     const attendanceData = {
       employeeId: BigInt(data.employeeId),
@@ -182,6 +197,21 @@ const validateClockOutTime = (
     return {
       valid: false,
       error: "Clock-out time must be after clock-in time"
+    };
+  }
+  
+  // NEW: Validate that clock-out is on the same calendar day as clock-in
+  const clockInDate = new Date(Number(clockInTimestamp));
+  const clockOutDate = new Date(Number(clockOutTimestamp));
+  
+  // Reset time parts to compare only dates
+  const clockInDay = new Date(clockInDate.getFullYear(), clockInDate.getMonth(), clockInDate.getDate());
+  const clockOutDay = new Date(clockOutDate.getFullYear(), clockOutDate.getMonth(), clockOutDate.getDate());
+  
+  if (clockOutDay.getTime() !== clockInDay.getTime()) {
+    return {
+      valid: false,
+      error: "Clock-out must be on the same calendar day as clock-in. Work sessions cannot span multiple days."
     };
   }
   

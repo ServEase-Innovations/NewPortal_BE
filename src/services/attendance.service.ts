@@ -182,6 +182,9 @@ export const getTodayAttendanceService = async (employeeId: bigint) => {
   todayEnd.setHours(23, 59, 59, 999);
   const todayEndMs = BigInt(todayEnd.getTime());
 
+  // First, check for any unclosed attendance from previous days and auto-close them
+  await autoClosePreviousDayAttendance(employeeId, todayStart);
+
   return prisma.attendance.findFirst({
     where: {
       employeeId: employeeId,
@@ -206,4 +209,55 @@ export const getTodayAttendanceService = async (employeeId: bigint) => {
       calendarDate: 'desc', // Deterministic ordering - most recent first
     },
   });
+};
+
+// Auto-close any attendance records from previous days that are still open
+export const autoClosePreviousDayAttendance = async (
+  employeeId: bigint,
+  currentDayStart: bigint
+) => {
+  try {
+    // Find all open attendance records (no clockOutTimestamp) from before today
+    const openRecords = await prisma.attendance.findMany({
+      where: {
+        employeeId: employeeId,
+        clockInTimestamp: { not: null },
+        clockOutTimestamp: null,
+        calendarDate: { lt: currentDayStart },
+      },
+    });
+
+    if (openRecords.length === 0) {
+      return;
+    }
+
+    console.log(`🔄 Auto-closing ${openRecords.length} previous day attendance record(s) for employee ${employeeId}`);
+
+    // Close each record at 11:59:59 PM of that day
+    for (const record of openRecords) {
+      const recordDate = new Date(Number(record.calendarDate));
+      recordDate.setHours(23, 59, 59, 999); // End of that day
+      const dayEndTimestamp = BigInt(recordDate.getTime());
+
+      // Calculate hours for that session
+      const clockInMs = Number(record.clockInTimestamp);
+      const clockOutMs = Number(dayEndTimestamp);
+      const sessionHours = (clockOutMs - clockInMs) / (1000 * 60 * 60);
+      const previousHours = Number(record.totalHoursComputed) || 0;
+      const totalHours = Math.round((previousHours + sessionHours) * 100) / 100;
+
+      await prisma.attendance.update({
+        where: { attendanceId: record.attendanceId },
+        data: {
+          clockOutTimestamp: dayEndTimestamp,
+          totalHoursComputed: totalHours,
+        },
+      });
+
+      console.log(`✅ Auto-closed attendance ID ${record.attendanceId} at ${recordDate.toISOString()} with ${totalHours}h total`);
+    }
+  } catch (error) {
+    console.error('Error auto-closing previous day attendance:', error);
+    // Don't throw - allow the main query to continue even if auto-close fails
+  }
 };
