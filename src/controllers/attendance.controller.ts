@@ -267,6 +267,13 @@ export const updateAttendance = async (
     if (data.clockOutTimestamp === null) {
       // Explicitly setting to null to resume work
       updateData.clockOutTimestamp = null;
+      
+      // IMPORTANT: If also providing a NEW clockInTimestamp when resuming,
+      // this means starting a fresh session, so reset totalHoursComputed to 0
+      if (data.clockInTimestamp) {
+        console.log('🆕 Resume with new clockIn - resetting hours to 0');
+        updateData.totalHoursComputed = 0;
+      }
     } else if (data.clockOutTimestamp) {
       updateData.clockOutTimestamp = BigInt(data.clockOutTimestamp);
       
@@ -296,8 +303,9 @@ export const updateAttendance = async (
       updateData.totalHoursComputed = calculation.totalHours;
     }
     
-    // If resuming work (clockOut = null), keep the previous accumulated hours
-    if (updateData.clockOutTimestamp === null) {
+    // If resuming work (clockOut = null), totalHoursComputed is handled above
+    if (updateData.clockOutTimestamp === null && !data.clockInTimestamp) {
+      // Pure resume (no new clockIn): Keep accumulated hours
       delete updateData.totalHoursComputed;
     }
 
