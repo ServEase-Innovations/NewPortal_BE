@@ -267,6 +267,10 @@ export const updateAttendance = async (
     if (data.clockOutTimestamp === null) {
       // Explicitly setting to null to resume work
       updateData.clockOutTimestamp = null;
+      
+      // DO NOT reset totalHoursComputed when resuming work
+      // The accumulated hours from previous sessions should be preserved
+      // so the UI can display the correct "Today's Progress"
     } else if (data.clockOutTimestamp) {
       updateData.clockOutTimestamp = BigInt(data.clockOutTimestamp);
       
@@ -296,8 +300,9 @@ export const updateAttendance = async (
       updateData.totalHoursComputed = calculation.totalHours;
     }
     
-    // If resuming work (clockOut = null), keep the previous accumulated hours
-    if (updateData.clockOutTimestamp === null) {
+    // If resuming work (clockOut = null), totalHoursComputed is handled above
+    if (updateData.clockOutTimestamp === null && !data.clockInTimestamp) {
+      // Pure resume (no new clockIn): Keep accumulated hours
       delete updateData.totalHoursComputed;
     }
 
