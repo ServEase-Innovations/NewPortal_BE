@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import { EmployeeRole } from "@prisma/client";
 
 import {
   createAttendance,
@@ -6,7 +7,49 @@ import {
   getAttendanceById,
   updateAttendance,
   deleteAttendance,
+  getAttendanceByEmployee,
+  getTodayAttendanceByEmployee,
 } from "../controllers/attendance.controller";
+import { authenticate, authorize, AuthRequest } from "../middleware/auth.middleware";
+
+// Middleware to check if user can access employee's data
+const checkEmployeeAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const authReq = req as AuthRequest;
+  const employeeIdParam = req.params.employeeId;
+  
+  // Handle potential array values
+  const employeeIdStr = Array.isArray(employeeIdParam) ? employeeIdParam[0] : employeeIdParam;
+  const requestedEmployeeId = Number.parseInt(employeeIdStr, 10);
+  
+  if (Number.isNaN(requestedEmployeeId)) {
+    return res.status(400).json({
+      message: "Invalid employee ID format",
+    });
+  }
+  
+  const currentEmployeeId = Number.parseInt(authReq.employee!.employeeId, 10);
+  const role = authReq.employee!.assignedRole;
+
+  // Allow if:
+  // 1. User is requesting their own data
+  // 2. User is SuperAdmin, HR, or Manager (can view all employees)
+  if (
+    currentEmployeeId === requestedEmployeeId ||
+    role === EmployeeRole.SuperAdmin ||
+    role === EmployeeRole.HR ||
+    role === EmployeeRole.Manager
+  ) {
+    return next();
+  }
+
+  return res.status(403).json({
+    message: "Access denied. You can only view your own attendance records.",
+  });
+};
 
 const router = Router();
 
@@ -67,27 +110,21 @@ const router = Router();
  *             schema:
  *               type: object
  *               properties:
- *                 message:
+ *                 attendanceId:
  *                   type: string
- *                   example: Attendance created successfully
- *                 attendance:
- *                   type: object
- *                   properties:
- *                     attendanceId:
- *                       type: string
- *                       description: Unique attendance record ID
- *                     employeeId:
- *                       type: integer
- *                     calendarDate:
- *                       type: integer
- *                     shiftStatus:
- *                       type: string
- *                     clockInTimestamp:
- *                       type: integer
- *                     clockOutTimestamp:
- *                       type: integer
- *                     totalHoursComputed:
- *                       type: number
+ *                   description: Unique attendance record ID
+ *                 employeeId:
+ *                   type: integer
+ *                 calendarDate:
+ *                   type: integer
+ *                 shiftStatus:
+ *                   type: string
+ *                 clockInTimestamp:
+ *                   type: integer
+ *                 clockOutTimestamp:
+ *                   type: integer
+ *                 totalHoursComputed:
+ *                   type: number
  *       400:
  *         description: Validation failed or invalid input
  *       401:
@@ -99,96 +136,51 @@ const router = Router();
  *       500:
  *         description: Server error
  */
-router.post("/", createAttendance);
+router.post("/", authenticate, createAttendance);
 
 /**
  * @swagger
  * /attendance:
  *   get:
  *     summary: Get all attendance records
- *     description: Returns a list of all attendance records with optional filtering. Accessible by SuperAdmin, HR, and Manager.
+ *     description: Returns a list of all attendance records. Accessible by SuperAdmin, HR, and Manager.
  *     tags:
  *       - Attendance
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: employeeId
- *         schema:
- *           type: integer
- *         description: Filter by employee ID
- *         example: 1
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: integer
- *         description: Filter records from this date (epoch milliseconds)
- *         example: 1783728000000
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: integer
- *         description: Filter records until this date (epoch milliseconds)
- *         example: 1784937600000
- *       - in: query
- *         name: shiftStatus
- *         schema:
- *           type: string
- *           enum: [Working, OnLeave, Absent]
- *         description: Filter by shift status
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *         description: Page number for pagination
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *         description: Number of items per page
  *     responses:
  *       200:
  *         description: Attendance records fetched successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 attendance:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       attendanceId:
- *                         type: string
- *                       employeeId:
- *                         type: integer
- *                       calendarDate:
- *                         type: integer
- *                         description: Attendance date as epoch milliseconds
- *                       shiftStatus:
- *                         type: string
- *                       clockInTimestamp:
- *                         type: integer
- *                       clockOutTimestamp:
- *                         type: integer
- *                       totalHoursComputed:
- *                         type: number
- *                 total:
- *                   type: integer
- *                   description: Total number of records
- *                 page:
- *                   type: integer
- *                 limit:
- *                   type: integer
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   attendanceId:
+ *                     type: string
+ *                   employeeId:
+ *                     type: integer
+ *                   calendarDate:
+ *                     type: integer
+ *                     description: Attendance date as epoch milliseconds
+ *                   shiftStatus:
+ *                     type: string
+ *                   clockInTimestamp:
+ *                     type: integer
+ *                   clockOutTimestamp:
+ *                     type: integer
+ *                   totalHoursComputed:
+ *                     type: number
  *       401:
  *         description: Authentication required
  *       403:
- *         description: Insufficient permissions
+ *         description: Insufficient permissions (requires SuperAdmin, HR, or Manager role)
  *       500:
  *         description: Server error
  */
-router.get("/", getAttendance);
+router.get("/", authenticate, authorize(EmployeeRole.SuperAdmin, EmployeeRole.HR, EmployeeRole.Manager), getAttendance);
 
 /**
  * @swagger
@@ -207,7 +199,7 @@ router.get("/", getAttendance);
  *       200:
  *         description: Attendance found
  */
-router.get("/:id", getAttendanceById);
+router.get("/:id", authenticate, getAttendanceById);
 
 /**
  * @swagger
@@ -232,7 +224,7 @@ router.get("/:id", getAttendanceById);
  *       200:
  *         description: Attendance updated
  */
-router.put("/:id", updateAttendance);
+router.put("/:id", authenticate, updateAttendance);
 
 /**
  * @swagger
@@ -251,6 +243,110 @@ router.put("/:id", updateAttendance);
  *       200:
  *         description: Attendance deleted
  */
-router.delete("/:id", deleteAttendance);
+router.delete("/:id", authenticate, authorize(EmployeeRole.SuperAdmin, EmployeeRole.HR), deleteAttendance);
+
+/**
+ * @swagger
+ * /attendance/employee/{employeeId}:
+ *   get:
+ *     summary: Get attendance records for a specific employee
+ *     description: Returns all attendance records for the specified employee, ordered by date (newest first)
+ *     tags:
+ *       - Attendance
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Employee ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Employee attendance records fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   attendanceId:
+ *                     type: string
+ *                   employeeId:
+ *                     type: integer
+ *                   calendarDate:
+ *                     type: integer
+ *                     description: Attendance date as epoch milliseconds
+ *                   shiftStatus:
+ *                     type: string
+ *                   clockInTimestamp:
+ *                     type: integer
+ *                   clockOutTimestamp:
+ *                     type: integer
+ *                   totalHoursComputed:
+ *                     type: number
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Insufficient permissions
+ *       500:
+ *         description: Server error
+ */
+router.get("/employee/:employeeId", authenticate, checkEmployeeAccess, getAttendanceByEmployee);
+
+/**
+ * @swagger
+ * /attendance/employee/{employeeId}/today:
+ *   get:
+ *     summary: Get today's attendance for a specific employee
+ *     description: Returns today's attendance record for the specified employee (if exists)
+ *     tags:
+ *       - Attendance
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Employee ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Today's attendance record found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 attendanceId:
+ *                   type: string
+ *                 employeeId:
+ *                   type: integer
+ *                 calendarDate:
+ *                   type: integer
+ *                   description: Attendance date as epoch milliseconds
+ *                 shiftStatus:
+ *                   type: string
+ *                 clockInTimestamp:
+ *                   type: integer
+ *                 clockOutTimestamp:
+ *                   type: integer
+ *                 totalHoursComputed:
+ *                   type: number
+ *       404:
+ *         description: No attendance record found for today
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Insufficient permissions
+ *       500:
+ *         description: Server error
+ */
+router.get("/employee/:employeeId/today", authenticate, checkEmployeeAccess, getTodayAttendanceByEmployee);
 
 export default router;
