@@ -268,9 +268,8 @@ export const updateAttendance = async (
       // Explicitly setting to null to resume work
       updateData.clockOutTimestamp = null;
       
-      // DO NOT reset totalHoursComputed when resuming work
-      // The accumulated hours from previous sessions should be preserved
-      // so the UI can display the correct "Today's Progress"
+      // When resuming work (clearing clockOut), keep totalHoursComputed unchanged
+      // so the accumulated hours from previous sessions are preserved
     } else if (data.clockOutTimestamp) {
       updateData.clockOutTimestamp = BigInt(data.clockOutTimestamp);
       
@@ -282,22 +281,84 @@ export const updateAttendance = async (
         return res.status(400).json({ message: validation.error });
       }
     }
+    
+    // NEW: If setting a NEW clockInTimestamp while record has a clockOutTimestamp,
+    // this is starting a NEW session after the previous one ended
+    if (data.clockInTimestamp && existingAttendance.clockOutTimestamp) {
+      // Starting a new session after previous session ended
+      // Check if this is the SAME calendar day or a NEW day
+      const recordCalendarDate = new Date(Number(existingAttendance.calendarDate));
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      const recordDateMs = recordCalendarDate.getTime();
+      const isSameDay = recordDateMs >= todayStart.getTime() && recordDateMs <= todayEnd.getTime();
+      
+      if (isSameDay) {
+        // Same day - KEEP accumulated hours for multiple sessions same day
+        console.log('🔄 Starting new session SAME DAY - preserving previous hours:', existingAttendance.totalHoursComputed);
+        // totalHoursComputed will be calculated when this session ends (on clockOut)
+      } else {
+        // Different day - RESET to 0 (this shouldn't happen - frontend should create new record!)
+        console.log('⚠️ WARNING: Starting new session on DIFFERENT DAY - should have created new record!');
+        console.log('   Record calendarDate:', recordCalendarDate.toISOString());
+        console.log('   Today:', new Date().toISOString());
+        console.log('   Resetting hours to 0');
+        updateData.totalHoursComputed = 0; // Reset for new day
+      }
+    }
 
     // CRITICAL: Calculate hours ONLY when stopping work (clockOut provided and not null)
     if (updateData.clockOutTimestamp && updateData.clockOutTimestamp !== null) {
-      const previousHours = Number(existingAttendance.totalHoursComputed) || 0;
+      // When stopping work, calculate session duration
+      // Use existing clockIn from the database (current session's start time)
+      const clockInForSession = existingAttendance.clockInTimestamp;
       
-      const calculation = validateAndCalculateHours(
-        existingAttendance.clockInTimestamp,
-        updateData.clockOutTimestamp,
-        previousHours
-      );
-      
-      if (!calculation.success) {
-        return res.status(400).json({ message: calculation.error });
+      if (!clockInForSession) {
+        return res.status(400).json({ message: "Cannot clock out without a clock-in time" });
       }
       
-      updateData.totalHoursComputed = calculation.totalHours;
+      // Calculate THIS session's duration
+      const clockInMs = Number(clockInForSession);
+      const clockOutMs = Number(updateData.clockOutTimestamp);
+      const sessionDurationMs = clockOutMs - clockInMs;
+      
+      if (sessionDurationMs < 0) {
+        return res.status(400).json({ message: "Clock-out time cannot be before clock-in time" });
+      }
+      
+      const sessionHours = sessionDurationMs / (1000 * 60 * 60);
+      
+      // Add to previous hours accumulated TODAY (from earlier sessions same day)
+      const previousHoursToday = Number(existingAttendance.totalHoursComputed) || 0;
+      const totalHours = Math.round((previousHoursToday + sessionHours) * 100) / 100;
+      
+      console.log(`⏸️ Clock out - Session: ${sessionHours.toFixed(2)}h + Previous today: ${previousHoursToday.toFixed(2)}h = Total: ${totalHours.toFixed(2)}h`);
+      
+      updateData.totalHoursComputed = totalHours;
+      
+      // NEW: Check if this is a weekend day (Saturday or Sunday)
+      const calendarDate = new Date(Number(existingAttendance.calendarDate));
+      const dayOfWeek = calendarDate.getUTCDay(); // 0=Sunday, 6=Saturday
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      
+      // NEW: Auto-set status based on 8-hour threshold (ONLY for weekdays)
+      // Weekends don't require 8 hours - any work is considered present
+      if (isWeekend) {
+        // Weekend: Any hours worked = Present
+        updateData.shiftStatus = AttendanceStatus.Working;
+        console.log(`✅ Weekend: Day marked as Present with ${totalHours.toFixed(2)}h (no 8-hour requirement)`);
+      } else if (totalHours >= 8.0) {
+        // Weekday: >= 8 hours = Present
+        updateData.shiftStatus = AttendanceStatus.Working;
+        console.log(`✅ Day marked as Present: ${totalHours.toFixed(2)}h >= 8.0h`);
+      } else {
+        // Weekday: < 8 hours = Absent
+        updateData.shiftStatus = AttendanceStatus.Absent;
+        console.log(`❌ Day marked as Absent: ${totalHours.toFixed(2)}h < 8.0h`);
+      }
     }
     
     // If resuming work (clockOut = null), totalHoursComputed is handled above

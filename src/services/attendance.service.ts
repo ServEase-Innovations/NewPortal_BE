@@ -246,15 +246,37 @@ export const autoClosePreviousDayAttendance = async (
       const previousHours = Number(record.totalHoursComputed) || 0;
       const totalHours = Math.round((previousHours + sessionHours) * 100) / 100;
 
+      // NEW: Check if this is a weekend day
+      const dayOfWeek = recordDate.getUTCDay(); // 0=Sunday, 6=Saturday
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+      // NEW: Determine status based on 8-hour threshold (ONLY for weekdays)
+      // Weekends don't require 8 hours - any work is considered present
+      let finalStatus = record.shiftStatus;
+      if (isWeekend) {
+        // Weekend: Any hours worked = Present
+        finalStatus = AttendanceStatus.Working;
+        console.log(`✅ Auto-close (Weekend): Day marked as Present with ${totalHours.toFixed(2)}h (no 8-hour requirement)`);
+      } else if (totalHours >= 8.0) {
+        // Weekday: >= 8 hours = Present
+        finalStatus = AttendanceStatus.Working;
+        console.log(`✅ Auto-close: Day marked as Present (${totalHours.toFixed(2)}h >= 8.0h)`);
+      } else {
+        // Weekday: < 8 hours = Absent
+        finalStatus = AttendanceStatus.Absent;
+        console.log(`❌ Auto-close: Day marked as Absent (${totalHours.toFixed(2)}h < 8.0h)`);
+      }
+
       await prisma.attendance.update({
         where: { attendanceId: record.attendanceId },
         data: {
           clockOutTimestamp: dayEndTimestamp,
           totalHoursComputed: totalHours,
+          shiftStatus: finalStatus,
         },
       });
 
-      console.log(`✅ Auto-closed attendance ID ${record.attendanceId} at ${recordDate.toISOString()} with ${totalHours}h total`);
+      console.log(`✅ Auto-closed attendance ID ${record.attendanceId} at ${recordDate.toISOString()} with ${totalHours}h total, status: ${finalStatus}`);
     }
   } catch (error) {
     console.error('Error auto-closing previous day attendance:', error);
