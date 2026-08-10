@@ -38,6 +38,9 @@ model Employee {
   approvedPayslips     Payslip[]             @relation("PayslipApprovedBy")
   paidPayslips         Payslip[]             @relation("PayslipPaidBy")
   payslipAuditLogs     PayslipAuditLog[]     @relation("PayslipAuditPerformedBy")
+  leaveBalances        LeaveBalance[]
+  leaveRequests        LeaveRequest[]
+  approvedLeaveRequests LeaveRequest[]       @relation("LeaveRequestApprovedBy")
 
   manager      Employee?  @relation("ManagerSubordinates", fields: [managerId], references: [employeeId])
   subordinates Employee[] @relation("ManagerSubordinates")
@@ -283,4 +286,130 @@ enum AppraisalState {
   Pristine
   InProgress
   Completed
+}
+
+enum LeaveType {
+  Privilege    // Annual/Earned leave (18 days)
+  Casual       // Flexi leave - casual (part of 6 flexi)
+  Sick         // Flexi leave - sick (part of 6 flexi)
+  Paternity    // Flexi leave - paternity (part of 6 flexi)
+  Maternity    // Special maternity leave
+  Unpaid       // Unpaid leave
+  CompOff      // Compensatory off
+}
+
+enum LeaveRequestStatus {
+  Pending
+  Approved
+  Rejected
+  Cancelled
+  Withdrawn
+}
+
+// HR-configurable leave policy for the organization
+model LeavePolicy {
+  leavePolicyId          BigInt   @id @default(autoincrement()) @map("leave_policy_id")
+  year                   Int      // Fiscal year (e.g., 2026)
+  privilegeLeaveDays     Decimal  @default(18) @map("privilege_leave_days") @db.Decimal(5, 2) // 18 days
+  flexiLeaveDays         Decimal  @default(6) @map("flexi_leave_days") @db.Decimal(5, 2)      // 6 days (casual + sick + paternity)
+  maternityLeaveDays     Decimal  @default(182) @map("maternity_leave_days") @db.Decimal(5, 2) // 6 months
+  compOffLeaveDays       Decimal  @default(0) @map("comp_off_leave_days") @db.Decimal(5, 2)    // Variable
+  
+  // Policy rules
+  carryForwardAllowed    Boolean  @default(true) @map("carry_forward_allowed")
+  maxCarryForwardDays    Decimal  @default(5) @map("max_carry_forward_days") @db.Decimal(5, 2)
+  encashmentAllowed      Boolean  @default(false) @map("encashment_allowed")
+  maxEncashmentDays      Decimal  @default(0) @map("max_encashment_days") @db.Decimal(5, 2)
+  
+  // Minimum notice requirements (in days)
+  minNoticePrivilege     Int      @default(7) @map("min_notice_privilege")
+  minNoticeFlexi         Int      @default(1) @map("min_notice_flexi")
+  
+  // Maximum consecutive days allowed
+  maxConsecutivePrivilege Int     @default(15) @map("max_consecutive_privilege")
+  maxConsecutiveFlexi    Int      @default(5) @map("max_consecutive_flexi")
+  
+  // Half-day leave support
+  halfDayLeaveAllowed    Boolean  @default(true) @map("half_day_leave_allowed")
+  
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              BigInt   @map("created_at")
+  updatedAt              BigInt   @map("updated_at")
+  createdByHR            String?  @map("created_by_hr") // HR admin who created this policy
+  
+  @@unique([year], name: "unique_leave_policy_year")
+  @@index([year, isActive], map: "idx_leave_policy_year_active")
+  @@map("leave_policies")
+}
+
+// Employee leave balance - tracks available leaves per employee per year
+model LeaveBalance {
+  leaveBalanceId         BigInt    @id @default(autoincrement()) @map("leave_balance_id")
+  employeeId             BigInt    @map("employee_id")
+  year                   Int       // Fiscal year
+  leaveType              LeaveType @map("leave_type")
+  
+  // Balance tracking
+  totalAllocated         Decimal   @map("total_allocated") @db.Decimal(5, 2) // Initial allocation
+  totalUsed              Decimal   @default(0) @map("total_used") @db.Decimal(5, 2)
+  totalPending           Decimal   @default(0) @map("total_pending") @db.Decimal(5, 2) // Pending approval
+  totalAvailable         Decimal   @map("total_available") @db.Decimal(5, 2) // Available = Allocated - Used - Pending
+  carriedForward         Decimal   @default(0) @map("carried_forward") @db.Decimal(5, 2) // From previous year
+  
+  // Audit
+  lastUpdated            BigInt    @map("last_updated")
+  createdAt              BigInt    @map("created_at")
+  
+  employee               Employee  @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  
+  @@unique([employeeId, year, leaveType], name: "unique_employee_year_leave_type")
+  @@index([employeeId, year], map: "idx_leave_balance_employee_year")
+  @@index([year], map: "idx_leave_balance_year")
+  @@map("leave_balances")
+}
+
+// Leave request - employee submits, manager approves/rejects
+model LeaveRequest {
+  leaveRequestId         BigInt             @id @default(autoincrement()) @map("leave_request_id")
+  employeeId             BigInt             @map("employee_id")
+  leaveType              LeaveType          @map("leave_type")
+  
+  // Request details
+  fromDate               BigInt             @map("from_date") // Epoch timestamp (calendar date)
+  toDate                 BigInt             @map("to_date")   // Epoch timestamp (calendar date)
+  isHalfDay              Boolean            @default(false) @map("is_half_day")
+  halfDayPeriod          String?            @map("half_day_period") // "FirstHalf" or "SecondHalf"
+  totalDays              Decimal            @map("total_days") @db.Decimal(5, 2) // e.g., 0.5 for half-day, 2.0 for 2 days
+  
+  reason                 String             @db.Text
+  contactNumber          String?            @map("contact_number")
+  emergencyContact       String?            @map("emergency_contact")
+  
+  // Supporting documents
+  attachmentUrl          String?            @map("attachment_url") @db.Text // For sick leave medical certificate, etc.
+  attachmentFileName     String?            @map("attachment_file_name")
+  
+  // Workflow
+  status                 LeaveRequestStatus @default(Pending)
+  submittedAt            BigInt             @map("submitted_at")
+  reviewedAt             BigInt?            @map("reviewed_at")
+  reviewedById           BigInt?            @map("reviewed_by_id") // Manager/HR who approved/rejected
+  reviewComments         String?            @map("review_comments") @db.Text
+  
+  // Cancellation
+  cancelledAt            BigInt?            @map("cancelled_at")
+  cancellationReason     String?            @map("cancellation_reason") @db.Text
+  
+  // Audit
+  createdAt              BigInt             @map("created_at")
+  updatedAt              BigInt             @map("updated_at")
+  
+  employee               Employee           @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  reviewedBy             Employee?          @relation("LeaveRequestApprovedBy", fields: [reviewedById], references: [employeeId], onDelete: Restrict)
+  
+  @@index([employeeId, status], map: "idx_leave_request_employee_status")
+  @@index([status, submittedAt], map: "idx_leave_request_status_submitted")
+  @@index([fromDate, toDate], map: "idx_leave_request_dates")
+  @@index([reviewedById], map: "idx_leave_request_reviewed_by")
+  @@map("leave_requests")
 }

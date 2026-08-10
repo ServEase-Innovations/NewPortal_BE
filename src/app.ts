@@ -12,6 +12,7 @@ import teamRoutes from "./routes/team.routes";
 import attendanceRoutes from "./routes/attendance.routes";
 import dailyTaskRoutes from "./routes/daily-task.routes";
 import payslipRoutes from "./routes/payslip.routes";
+import leaveRoutes from "./routes/leave.routes";
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ app.use("/teams", teamRoutes);
 app.use("/attendance", attendanceRoutes);
 app.use("/daily-tasks", dailyTaskRoutes);
 app.use("/payslips", payslipRoutes);
+app.use("/leave", leaveRoutes);
 app.use("/auth", authRoutes);
 
 app.listen(PORT, () => {
