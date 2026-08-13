@@ -1,5 +1,22 @@
 import { Request, Response } from "express";
-import { loginService } from "../services/auth.service";
+import { loginService, generateRefreshToken } from "../services/auth.service";
+
+// Cookie configuration
+const getCookieOptions = () => ({
+  httpOnly: true, // Cannot be accessed by JavaScript (XSS protection)
+  secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+  sameSite: 'strict' as const, // CSRF protection
+  maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  path: '/',
+});
+
+const getRefreshCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+});
 
 export const login = async (
   req: Request,
@@ -8,14 +25,19 @@ export const login = async (
   try {
     const { username, password } = req.body;
 
-    const result = await loginService(
-      username,
-      password
-    );
+    const result = await loginService(username, password);
 
+    // Set access token in HTTP-only cookie
+    res.cookie('accessToken', result.token, getCookieOptions());
+    
+    // Set refresh token in HTTP-only cookie (for future refresh flow)
+    const refreshToken = generateRefreshToken(result.employee.employeeId);
+    res.cookie('refreshToken', refreshToken, getRefreshCookieOptions());
+
+    // Return employee data (NO TOKEN in response body)
     res.status(200).json({
       message: "Login successful",
-      ...result,
+      employee: result.employee,
     });
   } catch (error: any) {
     res.status(401).json({
@@ -28,7 +50,35 @@ export const logout = async (
   req: Request,
   res: Response
 ) => {
+  // Clear cookies
+  res.clearCookie('accessToken', { path: '/' });
+  res.clearCookie('refreshToken', { path: '/' });
+  
   res.status(200).json({
     message: "Logout successful",
   });
+};
+
+export const getCurrentUser = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    // User is already attached to req by auth middleware
+    const user = (req as any).user;
+    
+    if (!user) {
+      return res.status(401).json({
+        message: "Not authenticated",
+      });
+    }
+
+    res.status(200).json({
+      employee: user,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      message: error.message,
+    });
+  }
 };

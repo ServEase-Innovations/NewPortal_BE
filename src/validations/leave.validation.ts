@@ -67,7 +67,7 @@ export const createLeaveRequestSchema = z
     toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     isHalfDay: z.boolean().optional().default(false),
     halfDayPeriod: z.enum(["FirstHalf", "SecondHalf"]).optional(),
-    reason: z.string().min(10).max(1000),
+    reason: z.string().min(5).max(1000),
     contactNumber: z.string().optional(),
     emergencyContact: z.string().optional(),
     attachmentUrl: z.string().url().optional(),

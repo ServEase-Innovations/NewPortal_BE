@@ -153,11 +153,26 @@ export const createLeaveRequest = async (req: Request, res: Response) => {
 
     const data = result.data;
 
-    // Validate: Cannot apply for past dates
+    // Validate: Cannot apply for past dates (EXCEPT Sick leave - can be backdated up to 7 days)
     if (isPastDate(data.fromDate)) {
-      return res.status(400).json({
-        message: "Cannot apply for leave on past dates",
-      });
+      if (data.leaveType === LeaveType.Sick) {
+        // Allow sick leave to be backdated up to 7 days
+        const leaveDate = new Date(data.fromDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const diffTime = today.getTime() - leaveDate.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 7) {
+          return res.status(400).json({
+            message: "Sick leave can only be backdated up to 7 days",
+          });
+        }
+      } else {
+        return res.status(400).json({
+          message: "Cannot apply for leave on past dates",
+        });
+      }
     }
 
     // Calculate total days
@@ -201,20 +216,23 @@ export const createLeaveRequest = async (req: Request, res: Response) => {
       });
     }
 
-    // Check notice requirement
-    const policy = await getOrCreateLeavePolicyService(year);
-    const minNotice =
-      data.leaveType === LeaveType.Privilege
-        ? policy.minNoticePrivilege
-        : policy.minNoticeFlexi;
+    // Check notice requirement (SKIP for Sick leave - employees can't predict illness)
+    if (data.leaveType !== LeaveType.Sick) {
+      const policy = await getOrCreateLeavePolicyService(year);
+      const minNotice =
+        data.leaveType === LeaveType.Privilege
+          ? policy.minNoticePrivilege
+          : policy.minNoticeFlexi;
 
-    if (!meetsNoticeRequirement(data.fromDate, minNotice)) {
-      return res.status(400).json({
-        message: `Leave request must be submitted at least ${minNotice} days in advance`,
-      });
+      if (!meetsNoticeRequirement(data.fromDate, minNotice)) {
+        return res.status(400).json({
+          message: `Leave request must be submitted at least ${minNotice} days in advance`,
+        });
+      }
     }
 
     // Check maximum consecutive days
+    const policy = await getOrCreateLeavePolicyService(year);
     const maxConsecutive =
       data.leaveType === LeaveType.Privilege
         ? policy.maxConsecutivePrivilege

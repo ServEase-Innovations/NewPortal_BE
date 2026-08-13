@@ -10,7 +10,7 @@ import { Prisma, LeaveType, LeaveRequestStatus } from "@prisma/client";
  * If no policy exists, creates default policy with 18 privilege + 6 flexi days
  */
 export const getOrCreateLeavePolicyService = async (year: number) => {
-  let policy = await prisma.leavePolicy.findUnique({
+  let policy = await prisma.leavePolicy.findFirst({
     where: { year },
   });
 

@@ -31,29 +31,54 @@ export const loginService = async (
     data: { last_login: BigInt(Date.now()) },
   });
 
- const token = jwt.sign(
-  {
-    employeeId: employee.employeeId.toString(), // Convert BigInt to string for JWT
-    username: employee.username,
-    emailAddress: employee.emailAddress,
-    assignedRole: employee.assignedRole,
-  },
-  process.env.JWT_SECRET as string,
-  {
-    expiresIn: "1d",
-  }
-);
-
-  return {
-    token,
-    employee: {
-      employeeId: employee.employeeId.toString(), // Convert BigInt to string
-      fullName: employee.fullName,
+  const token = jwt.sign(
+    {
+      employeeId: employee.employeeId.toString(),
       username: employee.username,
       emailAddress: employee.emailAddress,
       assignedRole: employee.assignedRole,
     },
+    process.env.JWT_SECRET as string,
+    {
+      expiresIn: "24h", // Short-lived access token
+    }
+  );
+
+  return {
+    token,
+    employee: {
+      employeeId: employee.employeeId.toString(),
+      fullName: employee.fullName,
+      username: employee.username,
+      emailAddress: employee.emailAddress,
+      assignedRole: employee.assignedRole,
+      assignedDepartment: employee.assignedDepartment,
+      isActive: employee.isActive,
+      baseSalary: employee.baseSalary ? Number(employee.baseSalary) : undefined,
+      allowances: employee.allowances ? Number(employee.allowances) : undefined,
+      deductions: employee.deductions ? Number(employee.deductions) : undefined,
+      joinedAt: employee.joinedAt ? employee.joinedAt.toString() : undefined,
+      lastLogin: employee.last_login ? employee.last_login.toString() : undefined,
+      managerId: employee.managerId ? employee.managerId.toString() : undefined,
+      teamId: employee.teamId ? employee.teamId : undefined,
+    },
   };
+};
+
+export const generateRefreshToken = (employeeId: string) => {
+  return jwt.sign(
+    { employeeId, type: 'refresh' },
+    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET as string,
+    { expiresIn: "7d" } // Long-lived refresh token
+  );
+};
+
+export const verifyToken = (token: string) => {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET as string);
+  } catch (error) {
+    throw new Error("Invalid or expired token");
+  }
 };
 
 

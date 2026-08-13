@@ -2,7 +2,9 @@ import { Router } from "express";
 import {
   login,
   logout,
+  getCurrentUser,
 } from "../controllers/auth.controller";
+import { authenticate } from "../middleware/auth.middleware";
 
 const router = Router();
 
@@ -52,5 +54,23 @@ router.post("/login", login);
  *         description: Logout successful
  */
 router.post("/logout", logout);
+
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Get current user
+ *     description: Get currently authenticated user details
+ *     tags:
+ *       - Authentication
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: User details
+ *       401:
+ *         description: Not authenticated
+ */
+router.get("/me", authenticate, getCurrentUser);
 
 export default router;
