@@ -1,6 +1,20 @@
 import prisma from "../prisma";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import * as jwt from "jsonwebtoken";
+
+// Get access token expiration time from environment or use secure default
+const getAccessTokenExpiresIn = (): string => {
+  const configuredTime = process.env.JWT_ACCESS_TOKEN_EXPIRES_IN;
+  
+  if (configuredTime) {
+    return configuredTime;
+  }
+  
+  // Default to 15 minutes for better security
+  // This is short enough to minimize risk if compromised,
+  // but long enough to provide good UX with refresh token rotation
+  return "15m";
+};
 
 // Helper to format employee data for API response
 export const formatEmployeeData = (employee: any) => ({
@@ -49,6 +63,7 @@ export const loginService = async (
     data: { last_login: BigInt(Date.now()) },
   });
 
+  // Generate access token with configurable expiry (default 15m)
   const token = jwt.sign(
     {
       employeeId: employee.employeeId.toString(),
@@ -57,9 +72,7 @@ export const loginService = async (
       assignedRole: employee.assignedRole,
     },
     process.env.JWT_SECRET as string,
-    {
-      expiresIn: "24h", // Short-lived access token
-    }
+    { expiresIn: (process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || "15m") as any }
   );
 
   return {
@@ -79,6 +92,54 @@ export const generateRefreshToken = (employeeId: string) => {
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: "7d" } // Long-lived refresh token
   );
+};
+
+export const refreshTokenService = async (refreshToken: string) => {
+  try {
+    // Verify refresh token
+    if (!process.env.JWT_REFRESH_SECRET) {
+      throw new Error('JWT_REFRESH_SECRET environment variable is required');
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET) as any;
+    
+    // Validate token type
+    if (decoded.type !== 'refresh') {
+      throw new Error('Invalid token type');
+    }
+
+    // Check if employee still exists and is active
+    const employee = await prisma.employee.findUnique({
+      where: { employeeId: parseInt(decoded.employeeId) }
+    });
+
+    if (!employee || !employee.isActive) {
+      throw new Error('Employee not found or inactive');
+    }
+
+    // Generate new access token with configurable expiry (default 15m)
+    const newAccessToken = jwt.sign(
+      {
+        employeeId: employee.employeeId.toString(),
+        username: employee.username,
+        emailAddress: employee.emailAddress,
+        assignedRole: employee.assignedRole,
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: (process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || "15m") as any }
+    );
+
+    // Generate new refresh token (token rotation for security)
+    const newRefreshToken = generateRefreshToken(employee.employeeId.toString());
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      employee: formatEmployeeData(employee),
+    };
+  } catch (error) {
+    throw new Error('Invalid or expired refresh token');
+  }
 };
 
 export const registerService = async (data: {

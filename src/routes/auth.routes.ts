@@ -3,8 +3,10 @@ import {
   login,
   logout,
   getCurrentUser,
+  refreshToken,
 } from "../controllers/auth.controller";
 import { authenticate } from "../middleware/auth.middleware";
+import { provideCSRFToken, protectCSRF, includeCSRFInResponse } from "../middleware/csrf.middleware";
 
 const router = Router();
 
@@ -39,7 +41,7 @@ const router = Router();
  *       200:
  *         description: Login successful
  */
-router.post("/login", login);
+router.post("/login", provideCSRFToken, includeCSRFInResponse, login);
 
 /**
  * @swagger
@@ -53,7 +55,39 @@ router.post("/login", login);
  *       200:
  *         description: Logout successful
  */
-router.post("/logout", logout);
+router.post("/logout", protectCSRF, logout);
+
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh Access Token
+ *     description: Generate new access token using refresh token
+ *     tags:
+ *       - Authentication
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *       401:
+ *         description: Invalid or expired refresh token
+ */
+router.post("/refresh", protectCSRF, provideCSRFToken, includeCSRFInResponse, refreshToken);
+
+/**
+ * @swagger
+ * /auth/csrf-token:
+ *   get:
+ *     summary: Get CSRF Token
+ *     description: Get CSRF token for protected operations (only needed when CSRF protection is enabled)
+ *     tags:
+ *       - Authentication
+ *     responses:
+ *       200:
+ *         description: CSRF token provided
+ */
+router.get("/csrf-token", provideCSRFToken, includeCSRFInResponse, (req, res) => {
+  res.json({ csrfToken: req.csrfToken || null });
+});
 
 /**
  * @swagger

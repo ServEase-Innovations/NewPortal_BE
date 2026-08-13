@@ -1,23 +1,97 @@
 import { Request, Response } from "express";
-import { loginService, generateRefreshToken, formatEmployeeData } from "../services/auth.service";
+import { loginService, generateRefreshToken, formatEmployeeData, refreshTokenService } from "../services/auth.service";
+import { provideCSRFToken, includeCSRFInResponse } from "../middleware/csrf.middleware";
+import { AuthRequest } from "../middleware/auth.middleware";
 import prisma from "../prisma";
 
-// Cookie configuration
-const getCookieOptions = () => ({
-  httpOnly: true, // Cannot be accessed by JavaScript (XSS protection)
-  secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-  sameSite: 'lax' as const, // Allow cross-origin requests (changed from 'strict')
-  maxAge: 24 * 60 * 60 * 1000, // 24 hours
-  path: '/',
-});
+// Cookie configuration with environment-aware sameSite policy
+const getSameSitePolicy = (): 'strict' | 'lax' | 'none' => {
+  const policy = process.env.COOKIE_SAMESITE_POLICY;
+  
+  // If explicitly set, use that value
+  if (policy === 'strict' || policy === 'lax' || policy === 'none') {
+    return policy;
+  }
+  
+  // Auto-detect based on environment
+  if (process.env.NODE_ENV === 'production') {
+    // In production, check if we need cross-site cookies
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    const backendUrl = process.env.BACKEND_URL || '';
+    
+    // If URLs are provided and are cross-site, use 'none'
+    if (frontendUrl && backendUrl) {
+      try {
+        const frontendDomain = new URL(frontendUrl).hostname;
+        const backendDomain = new URL(backendUrl).hostname;
+        
+        // Check if they're different registrable domains
+        const isCrossSite = !frontendDomain.endsWith(backendDomain.split('.').slice(-2).join('.')) &&
+                           !backendDomain.endsWith(frontendDomain.split('.').slice(-2).join('.'));
+        
+        return isCrossSite ? 'none' : 'lax';
+      } catch {
+        // If URL parsing fails, default to 'lax'
+        return 'lax';
+      }
+    }
+    
+    // Default to 'lax' for production if no URLs provided
+    return 'lax';
+  }
+  
+  // Development default - 'lax' for cross-origin localhost requests
+  return 'lax';
+};
 
-const getRefreshCookieOptions = () => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const, // Allow cross-origin requests (changed from 'strict')
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  path: '/',
-});
+// Convert JWT expiry string to milliseconds for cookie maxAge
+const parseJWTExpiryToMs = (expiryString: string): number => {
+  const defaultTime = process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || "15m";
+  const timeStr = expiryString || defaultTime;
+  
+  // Parse time string (e.g., "15m", "1h", "24h")
+  const match = timeStr.match(/^(\d+)([smhd])$/);
+  if (!match) {
+    // Default to 15 minutes if parsing fails
+    return 15 * 60 * 1000;
+  }
+  
+  const [, value, unit] = match;
+  const numValue = parseInt(value);
+  
+  switch (unit) {
+    case 's': return numValue * 1000;
+    case 'm': return numValue * 60 * 1000;
+    case 'h': return numValue * 60 * 60 * 1000;
+    case 'd': return numValue * 24 * 60 * 60 * 1000;
+    default: return 15 * 60 * 1000; // 15 minutes default
+  }
+};
+
+const getCookieOptions = () => {
+  const sameSite = getSameSitePolicy();
+  const accessTokenExpiry = process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || "15m";
+  
+  return {
+    httpOnly: true, // Cannot be accessed by JavaScript (XSS protection)
+    secure: process.env.NODE_ENV === 'production' || sameSite === 'none', // HTTPS required for sameSite=none
+    sameSite,
+    maxAge: parseJWTExpiryToMs(accessTokenExpiry), // Match JWT token lifetime
+    path: '/',
+  };
+};
+
+const getRefreshCookieOptions = () => {
+  const sameSite = getSameSitePolicy();
+  
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production' || sameSite === 'none', // HTTPS required for sameSite=none
+    sameSite,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+  };
+};
 
 export const login = async (
   req: Request,
@@ -35,14 +109,26 @@ export const login = async (
     const refreshToken = generateRefreshToken(result.employee.employeeId);
     res.cookie('refreshToken', refreshToken, getRefreshCookieOptions());
 
-    // Return employee data (NO TOKEN in response body)
-    res.status(200).json({
+    // Prepare response data
+    const responseData: any = {
       message: "Login successful",
       employee: result.employee,
-    });
+    };
+
+    // Add CSRF token to response if CSRF protection is enabled
+    if (req.csrfToken) {
+      responseData.csrfToken = req.csrfToken;
+    }
+
+    // Return employee data (NO TOKEN in response body)
+    res.status(200).json(responseData);
   } catch (error: any) {
+    // Log the actual error for debugging
+    console.error('[Login] Error:', error);
+    
+    // Return user-friendly message (loginService already provides safe messages)
     res.status(401).json({
-      message: error.message,
+      message: error.message || "Invalid credentials",
     });
   }
 };
@@ -54,19 +140,62 @@ export const logout = async (
   // Clear cookies
   res.clearCookie('accessToken', { path: '/' });
   res.clearCookie('refreshToken', { path: '/' });
+  res.clearCookie('csrfToken', { path: '/' }); // Clear CSRF token on logout
   
   res.status(200).json({
     message: "Logout successful",
   });
 };
 
-export const getCurrentUser = async (
+export const refreshToken = async (
   req: Request,
   res: Response
 ) => {
   try {
+    // Get refresh token from cookie
+    const refreshToken = req.cookies?.refreshToken;
+    
+    if (!refreshToken) {
+      return res.status(401).json({
+        message: "Refresh token not found",
+      });
+    }
+
+    // Refresh tokens and get new tokens
+    const result = await refreshTokenService(refreshToken);
+
+    // Set new access token cookie
+    res.cookie('accessToken', result.accessToken, getCookieOptions());
+    
+    // Set new refresh token cookie (token rotation)
+    res.cookie('refreshToken', result.refreshToken, getRefreshCookieOptions());
+
+    // Return success with employee data
+    res.status(200).json({
+      message: "Token refreshed successfully",
+      employee: result.employee,
+    });
+  } catch (error: any) {
+    // Log the actual error for server-side debugging
+    console.error('[RefreshToken] Error:', error);
+    
+    // Clear invalid refresh token
+    res.clearCookie('refreshToken', { path: '/' });
+    
+    // Don't expose internal error details
+    res.status(401).json({
+      message: "Invalid or expired refresh token",
+    });
+  }
+};
+
+export const getCurrentUser = async (
+  req: AuthRequest,
+  res: Response
+) => {
+  try {
     // Employee JWT payload is attached to req by auth middleware
-    const employeeFromToken = (req as any).employee;
+    const employeeFromToken = req.employee;
     
     if (!employeeFromToken) {
       return res.status(401).json({
@@ -88,9 +217,12 @@ export const getCurrentUser = async (
     // Use shared formatter for consistent response format
     res.status(200).json(formatEmployeeData(employee));
   } catch (error: any) {
-    console.error('[getCurrentUser] Error:', error.message);
+    // Log the actual error for server-side debugging
+    console.error('[getCurrentUser] Error:', error);
+    
+    // Don't expose internal error details (could be DB errors, etc.)
     res.status(500).json({
-      message: error.message,
+      message: "Internal server error",
     });
   }
 };
