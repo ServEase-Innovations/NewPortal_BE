@@ -25,18 +25,20 @@ app.use(express.json());
 app.use(cookieParser()); // Parse cookies from requests
 
 // CORS configuration with credentials support
-const allowedOrigins = [
+const allowedOriginsArray = [
   'http://localhost:3000', // Development frontend
   'http://localhost:8080', // Alternative dev port
   process.env.FRONTEND_URL, // Production frontend URL from env
 ].filter(Boolean); // Remove undefined values
+
+const allowedOrigins = new Set(allowedOriginsArray);
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+    if (allowedOrigins.has(origin)) {
       return callback(null, true);
     }
     

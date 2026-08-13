@@ -139,6 +139,91 @@ export const getLeaveBalances = async (req: Request, res: Response) => {
 // ============================================================================
 // LEAVE REQUEST CONTROLLERS
 // ============================================================================
+// HELPER FUNCTIONS FOR LEAVE REQUEST VALIDATION
+// ============================================================================
+
+const validatePastDate = (fromDate: string, leaveType: LeaveType): { valid: boolean; message?: string } => {
+  if (!isPastDate(fromDate)) {
+    return { valid: true };
+  }
+
+  if (leaveType === LeaveType.Sick) {
+    const leaveDate = new Date(fromDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffTime = today.getTime() - leaveDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 7) {
+      return { valid: false, message: "Sick leave can only be backdated up to 7 days" };
+    }
+    return { valid: true };
+  }
+  
+  return { valid: false, message: "Cannot apply for leave on past dates" };
+};
+
+const validateLeaveBalance = (balance: any, totalDays: number, balanceType: LeaveType): { valid: boolean; message?: string } => {
+  if (!balance) {
+    return { valid: false, message: `Leave balance not found for type: ${balanceType}` };
+  }
+
+  if (Number(balance.totalAvailable) < totalDays) {
+    return { 
+      valid: false, 
+      message: `Insufficient leave balance. Available: ${balance.totalAvailable} days, Requested: ${totalDays} days` 
+    };
+  }
+
+  return { valid: true };
+};
+
+const validateNoticeRequirement = async (fromDate: string, leaveType: LeaveType, year: number): Promise<{ valid: boolean; message?: string }> => {
+  if (leaveType === LeaveType.Sick) {
+    return { valid: true }; // Skip notice requirement for sick leave
+  }
+
+  const policy = await getOrCreateLeavePolicyService(year);
+  const minNotice = leaveType === LeaveType.Privilege 
+    ? policy.minNoticePrivilege 
+    : policy.minNoticeFlexi;
+
+  if (!meetsNoticeRequirement(fromDate, minNotice)) {
+    return { 
+      valid: false, 
+      message: `Leave request must be submitted at least ${minNotice} days in advance` 
+    };
+  }
+
+  return { valid: true };
+};
+
+const validateConsecutiveDays = async (totalDays: number, leaveType: LeaveType, year: number): Promise<{ valid: boolean; message?: string }> => {
+  const policy = await getOrCreateLeavePolicyService(year);
+  const maxConsecutive = leaveType === LeaveType.Privilege 
+    ? policy.maxConsecutivePrivilege 
+    : policy.maxConsecutiveFlexi;
+
+  if (totalDays > maxConsecutive) {
+    return { 
+      valid: false, 
+      message: `Cannot apply for more than ${maxConsecutive} consecutive days for ${leaveType} leave` 
+    };
+  }
+
+  return { valid: true };
+};
+
+const mapLeaveTypeToBalance = (leaveType: LeaveType): LeaveType => {
+  if (leaveType === LeaveType.Sick || leaveType === LeaveType.Paternity) {
+    return LeaveType.Casual; // All flexi types share same balance
+  }
+  return leaveType;
+};
+
+// ============================================================================
+// LEAVE REQUEST CONTROLLER
+// ============================================================================
 
 export const createLeaveRequest = async (req: Request, res: Response) => {
   try {
@@ -153,26 +238,10 @@ export const createLeaveRequest = async (req: Request, res: Response) => {
 
     const data = result.data;
 
-    // Validate: Cannot apply for past dates (EXCEPT Sick leave - can be backdated up to 7 days)
-    if (isPastDate(data.fromDate)) {
-      if (data.leaveType === LeaveType.Sick) {
-        // Allow sick leave to be backdated up to 7 days
-        const leaveDate = new Date(data.fromDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const diffTime = today.getTime() - leaveDate.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays > 7) {
-          return res.status(400).json({
-            message: "Sick leave can only be backdated up to 7 days",
-          });
-        }
-      } else {
-        return res.status(400).json({
-          message: "Cannot apply for leave on past dates",
-        });
-      }
+    // Validate past date
+    const pastDateValidation = validatePastDate(data.fromDate, data.leaveType);
+    if (!pastDateValidation.valid) {
+      return res.status(400).json({ message: pastDateValidation.message });
     }
 
     // Calculate total days
@@ -188,60 +257,25 @@ export const createLeaveRequest = async (req: Request, res: Response) => {
 
     // Check leave balance
     const year = fromDate.getFullYear();
-    const balances = await getAllLeaveBalancesService(
-      BigInt(data.employeeId),
-      year
-    );
-
-    // Map leave type to balance type
-    let balanceType = data.leaveType;
-    if (
-      data.leaveType === LeaveType.Sick ||
-      data.leaveType === LeaveType.Paternity
-    ) {
-      balanceType = LeaveType.Casual; // All flexi types share same balance
-    }
-
+    const balances = await getAllLeaveBalancesService(BigInt(data.employeeId), year);
+    const balanceType = mapLeaveTypeToBalance(data.leaveType);
     const balance = balances.find((b) => b.leaveType === balanceType);
 
-    if (!balance) {
-      return res.status(400).json({
-        message: `Leave balance not found for type: ${balanceType}`,
-      });
+    const balanceValidation = validateLeaveBalance(balance, totalDays, balanceType);
+    if (!balanceValidation.valid) {
+      return res.status(400).json({ message: balanceValidation.message });
     }
 
-    if (Number(balance.totalAvailable) < totalDays) {
-      return res.status(400).json({
-        message: `Insufficient leave balance. Available: ${balance.totalAvailable} days, Requested: ${totalDays} days`,
-      });
+    // Validate notice requirement
+    const noticeValidation = await validateNoticeRequirement(data.fromDate, data.leaveType, year);
+    if (!noticeValidation.valid) {
+      return res.status(400).json({ message: noticeValidation.message });
     }
 
-    // Check notice requirement (SKIP for Sick leave - employees can't predict illness)
-    if (data.leaveType !== LeaveType.Sick) {
-      const policy = await getOrCreateLeavePolicyService(year);
-      const minNotice =
-        data.leaveType === LeaveType.Privilege
-          ? policy.minNoticePrivilege
-          : policy.minNoticeFlexi;
-
-      if (!meetsNoticeRequirement(data.fromDate, minNotice)) {
-        return res.status(400).json({
-          message: `Leave request must be submitted at least ${minNotice} days in advance`,
-        });
-      }
-    }
-
-    // Check maximum consecutive days
-    const policy = await getOrCreateLeavePolicyService(year);
-    const maxConsecutive =
-      data.leaveType === LeaveType.Privilege
-        ? policy.maxConsecutivePrivilege
-        : policy.maxConsecutiveFlexi;
-
-    if (totalDays > maxConsecutive) {
-      return res.status(400).json({
-        message: `Cannot apply for more than ${maxConsecutive} consecutive days for ${data.leaveType} leave`,
-      });
+    // Validate consecutive days
+    const consecutiveValidation = await validateConsecutiveDays(totalDays, data.leaveType, year);
+    if (!consecutiveValidation.valid) {
+      return res.status(400).json({ message: consecutiveValidation.message });
     }
 
     // Create leave request
@@ -287,7 +321,7 @@ export const getLeaveRequests = async (req: Request, res: Response) => {
       return res.status(200).json(serializeBigInt(requests));
     }
 
-    // Get all leave requests (admin/manager view)
+    // Get all leave requests by date range (admin/manager view)
     const fromDateParam = req.query.fromDate;
     const toDateParam = req.query.toDate;
     const fromDate = typeof fromDateParam === 'string' ? fromDateParam : undefined;

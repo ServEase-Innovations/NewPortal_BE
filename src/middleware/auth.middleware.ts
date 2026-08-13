@@ -24,7 +24,7 @@ export const authenticate = (
   // Fallback: Check Authorization header for backward compatibility during migration
   if (!token) {
     const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
+    if (authHeader?.startsWith("Bearer ")) {
       token = authHeader.split(" ")[1];
     }
   }
