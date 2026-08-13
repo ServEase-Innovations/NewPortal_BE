@@ -67,9 +67,6 @@ export const getCurrentUser = async (
     // Employee JWT payload is attached to req by auth middleware
     const employeeFromToken = (req as any).employee;
     
-    console.log('[getCurrentUser] Token payload:', employeeFromToken);
-    console.log('[getCurrentUser] Cookies:', req.cookies);
-    
     if (!employeeFromToken) {
       return res.status(401).json({
         message: "Not authenticated",
@@ -83,18 +80,15 @@ export const getCurrentUser = async (
     });
 
     if (!employee) {
-      console.log('[getCurrentUser] Employee not found in DB:', employeeFromToken.employeeId);
       return res.status(404).json({
         message: "Employee not found",
       });
     }
 
-    console.log('[getCurrentUser] Returning employee:', employee.fullName);
-
     // Use shared formatter for consistent response format
     res.status(200).json(formatEmployeeData(employee));
   } catch (error: any) {
-    console.error('[getCurrentUser] Error:', error);
+    console.error('[getCurrentUser] Error:', error.message);
     res.status(500).json({
       message: error.message,
     });
