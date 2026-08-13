@@ -2,6 +2,24 @@ import prisma from "../prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+// Helper to format employee data for API response
+export const formatEmployeeData = (employee: any) => ({
+  employeeId: employee.employeeId.toString(),
+  fullName: employee.fullName,
+  username: employee.username,
+  emailAddress: employee.emailAddress,
+  assignedRole: employee.assignedRole,
+  assignedDepartment: employee.assignedDepartment,
+  isActive: employee.isActive,
+  baseSalary: employee.baseSalary ? Number(employee.baseSalary) : undefined,
+  allowances: employee.allowances ? Number(employee.allowances) : undefined,
+  deductions: employee.deductions ? Number(employee.deductions) : undefined,
+  joinedAt: employee.joinedAt ? employee.joinedAt.toString() : undefined,
+  lastLogin: employee.last_login ? employee.last_login.toString() : undefined,
+  managerId: employee.managerId ? employee.managerId.toString() : undefined,
+  teamId: employee.teamId ? employee.teamId : undefined,
+});
+
 export const loginService = async (
   username: string,
   password: string
@@ -46,22 +64,7 @@ export const loginService = async (
 
   return {
     token,
-    employee: {
-      employeeId: employee.employeeId.toString(),
-      fullName: employee.fullName,
-      username: employee.username,
-      emailAddress: employee.emailAddress,
-      assignedRole: employee.assignedRole,
-      assignedDepartment: employee.assignedDepartment,
-      isActive: employee.isActive,
-      baseSalary: employee.baseSalary ? Number(employee.baseSalary) : undefined,
-      allowances: employee.allowances ? Number(employee.allowances) : undefined,
-      deductions: employee.deductions ? Number(employee.deductions) : undefined,
-      joinedAt: employee.joinedAt ? employee.joinedAt.toString() : undefined,
-      lastLogin: employee.last_login ? employee.last_login.toString() : undefined,
-      managerId: employee.managerId ? employee.managerId.toString() : undefined,
-      teamId: employee.teamId ? employee.teamId : undefined,
-    },
+    employee: formatEmployeeData(employee),
   };
 };
 

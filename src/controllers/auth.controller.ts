@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { loginService, generateRefreshToken } from "../services/auth.service";
+import { loginService, generateRefreshToken, formatEmployeeData } from "../services/auth.service";
 
 // Cookie configuration
 const getCookieOptions = () => ({
@@ -91,23 +91,8 @@ export const getCurrentUser = async (
 
     console.log('[getCurrentUser] Returning employee:', employee.fullName);
 
-    // Return employee data in the same format as login
-    res.status(200).json({
-      employeeId: employee.employeeId.toString(),
-      fullName: employee.fullName,
-      username: employee.username,
-      emailAddress: employee.emailAddress,
-      assignedRole: employee.assignedRole,
-      assignedDepartment: employee.assignedDepartment,
-      isActive: employee.isActive,
-      baseSalary: employee.baseSalary ? Number(employee.baseSalary) : undefined,
-      allowances: employee.allowances ? Number(employee.allowances) : undefined,
-      deductions: employee.deductions ? Number(employee.deductions) : undefined,
-      joinedAt: employee.joinedAt ? employee.joinedAt.toString() : undefined,
-      lastLogin: employee.last_login ? employee.last_login.toString() : undefined,
-      managerId: employee.managerId ? employee.managerId.toString() : undefined,
-      teamId: employee.teamId ? employee.teamId : undefined,
-    });
+    // Use shared formatter for consistent response format
+    res.status(200).json(formatEmployeeData(employee));
   } catch (error: any) {
     console.error('[getCurrentUser] Error:', error);
     res.status(500).json({
