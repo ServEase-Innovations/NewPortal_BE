@@ -64,19 +64,52 @@ export const getCurrentUser = async (
   res: Response
 ) => {
   try {
-    // User is already attached to req by auth middleware
-    const user = (req as any).user;
+    // Employee JWT payload is attached to req by auth middleware
+    const employeeFromToken = (req as any).employee;
     
-    if (!user) {
+    console.log('[getCurrentUser] Token payload:', employeeFromToken);
+    console.log('[getCurrentUser] Cookies:', req.cookies);
+    
+    if (!employeeFromToken) {
       return res.status(401).json({
         message: "Not authenticated",
       });
     }
 
+    // Fetch full employee data from database
+    const prisma = require("../prisma").default;
+    const employee = await prisma.employee.findUnique({
+      where: { employeeId: BigInt(employeeFromToken.employeeId) },
+    });
+
+    if (!employee) {
+      console.log('[getCurrentUser] Employee not found in DB:', employeeFromToken.employeeId);
+      return res.status(404).json({
+        message: "Employee not found",
+      });
+    }
+
+    console.log('[getCurrentUser] Returning employee:', employee.fullName);
+
+    // Return employee data in the same format as login
     res.status(200).json({
-      employee: user,
+      employeeId: employee.employeeId.toString(),
+      fullName: employee.fullName,
+      username: employee.username,
+      emailAddress: employee.emailAddress,
+      assignedRole: employee.assignedRole,
+      assignedDepartment: employee.assignedDepartment,
+      isActive: employee.isActive,
+      baseSalary: employee.baseSalary ? Number(employee.baseSalary) : undefined,
+      allowances: employee.allowances ? Number(employee.allowances) : undefined,
+      deductions: employee.deductions ? Number(employee.deductions) : undefined,
+      joinedAt: employee.joinedAt ? employee.joinedAt.toString() : undefined,
+      lastLogin: employee.last_login ? employee.last_login.toString() : undefined,
+      managerId: employee.managerId ? employee.managerId.toString() : undefined,
+      teamId: employee.teamId ? employee.teamId : undefined,
     });
   } catch (error: any) {
+    console.error('[getCurrentUser] Error:', error);
     res.status(500).json({
       message: error.message,
     });
