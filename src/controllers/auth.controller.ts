@@ -1,11 +1,12 @@
 import { Request, Response } from "express";
 import { loginService, generateRefreshToken, formatEmployeeData } from "../services/auth.service";
+import prisma from "../prisma";
 
 // Cookie configuration
 const getCookieOptions = () => ({
   httpOnly: true, // Cannot be accessed by JavaScript (XSS protection)
   secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-  sameSite: 'strict' as const, // CSRF protection
+  sameSite: 'lax' as const, // Allow cross-origin requests (changed from 'strict')
   maxAge: 24 * 60 * 60 * 1000, // 24 hours
   path: '/',
 });
@@ -13,7 +14,7 @@ const getCookieOptions = () => ({
 const getRefreshCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  sameSite: 'lax' as const, // Allow cross-origin requests (changed from 'strict')
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
 });
@@ -74,7 +75,6 @@ export const getCurrentUser = async (
     }
 
     // Fetch full employee data from database
-    const prisma = require("../prisma").default;
     const employee = await prisma.employee.findUnique({
       where: { employeeId: BigInt(employeeFromToken.employeeId) },
     });

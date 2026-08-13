@@ -44,7 +44,15 @@ export const authenticate = (
       username: string;
       emailAddress: string;
       assignedRole: EmployeeRole;
+      type?: string;
     };
+
+    // Reject refresh tokens - they should not be used for API access
+    if (decoded.type === 'refresh') {
+      return res.status(401).json({
+        message: "Invalid token type. Refresh tokens cannot be used for API access.",
+      });
+    }
 
     (req as AuthRequest).employee = decoded;
     next();

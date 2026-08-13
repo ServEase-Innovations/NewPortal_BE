@@ -69,21 +69,17 @@ export const loginService = async (
 };
 
 export const generateRefreshToken = (employeeId: string) => {
+  // Ensure refresh token uses a different secret - fail fast if not set
+  if (!process.env.JWT_REFRESH_SECRET) {
+    throw new Error('JWT_REFRESH_SECRET environment variable is required');
+  }
+  
   return jwt.sign(
     { employeeId, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET as string,
+    process.env.JWT_REFRESH_SECRET,
     { expiresIn: "7d" } // Long-lived refresh token
   );
 };
-
-export const verifyToken = (token: string) => {
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET as string);
-  } catch (error) {
-    throw new Error("Invalid or expired token");
-  }
-};
-
 
 export const registerService = async (data: {
   fullName: string;
