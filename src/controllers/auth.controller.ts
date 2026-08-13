@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { loginService, generateRefreshToken, formatEmployeeData, refreshTokenService } from "../services/auth.service";
 import { provideCSRFToken, includeCSRFInResponse } from "../middleware/csrf.middleware";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { parseJWTExpiryToMs } from "../utils/time.utils";
 import prisma from "../prisma";
 
 // Cookie configuration with environment-aware sameSite policy
@@ -42,30 +43,6 @@ const getSameSitePolicy = (): 'strict' | 'lax' | 'none' => {
   
   // Development default - 'lax' for cross-origin localhost requests
   return 'lax';
-};
-
-// Convert JWT expiry string to milliseconds for cookie maxAge
-const parseJWTExpiryToMs = (expiryString: string): number => {
-  const defaultTime = process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || "15m";
-  const timeStr = expiryString || defaultTime;
-  
-  // Parse time string (e.g., "15m", "1h", "24h")
-  const match = timeStr.match(/^(\d+)([smhd])$/);
-  if (!match) {
-    // Default to 15 minutes if parsing fails
-    return 15 * 60 * 1000;
-  }
-  
-  const [, value, unit] = match;
-  const numValue = parseInt(value);
-  
-  switch (unit) {
-    case 's': return numValue * 1000;
-    case 'm': return numValue * 60 * 1000;
-    case 'h': return numValue * 60 * 60 * 1000;
-    case 'd': return numValue * 24 * 60 * 60 * 1000;
-    default: return 15 * 60 * 1000; // 15 minutes default
-  }
 };
 
 const getCookieOptions = () => {
