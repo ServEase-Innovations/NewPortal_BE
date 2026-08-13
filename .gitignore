@@ -162,3 +162,10 @@ SWAGGER_AUTO_GENERATION.md
 AUTO_SWAGGER_SETUP_COMPLETE.md
 MIGRATION_FIX_README.md
 prisma/MIGRATIONS.md
+
+# Test and verification scripts
+check-*.js
+fix-*.js
+verify-*.js
+verify-*.ts
+test-*.sh
