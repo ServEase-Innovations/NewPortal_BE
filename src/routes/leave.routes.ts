@@ -12,8 +12,12 @@ import {
   rejectLeaveRequest,
   cancelLeaveRequest,
 } from "../controllers/leave.controller";
+import { authenticate, authorize } from "../middleware/auth.middleware";
 
 const router = express.Router();
+
+// Apply authentication to ALL leave routes
+router.use(authenticate);
 
 // ============================================================================
 // LEAVE POLICY ROUTES
@@ -31,7 +35,7 @@ router.get("/policy/:year", getLeavePolicy);
  * @desc    Update leave policy for a specific year
  * @access  HR/SuperAdmin only
  */
-router.put("/policy/:year", updateLeavePolicy);
+router.put("/policy/:year", authorize("HR", "SuperAdmin"), updateLeavePolicy);
 
 // ============================================================================
 // LEAVE BALANCE ROUTES
@@ -43,7 +47,7 @@ router.put("/policy/:year", updateLeavePolicy);
  * @access  HR/SuperAdmin only
  * @body    { employeeId: string, year: number }
  */
-router.post("/balance/initialize", initializeLeaveBalances);
+router.post("/balance/initialize", authorize("HR", "SuperAdmin"), initializeLeaveBalances);
 
 /**
  * @route   GET /api/leave/balance/:employeeId
@@ -98,7 +102,7 @@ router.get("/request/:id", getLeaveRequestById);
  * @desc    Get pending leave requests for a manager's team
  * @access  Manager/HR only
  */
-router.get("/request/pending/manager/:managerId", getPendingLeaveRequestsForManager);
+router.get("/request/pending/manager/:managerId", authorize("Manager", "HR", "SuperAdmin"), getPendingLeaveRequestsForManager);
 
 /**
  * @route   PUT /api/leave/request/:id/approve
@@ -106,7 +110,7 @@ router.get("/request/pending/manager/:managerId", getPendingLeaveRequestsForMana
  * @access  Manager/HR only
  * @body    { reviewedById: string, reviewComments?: string }
  */
-router.put("/request/:id/approve", approveLeaveRequest);
+router.put("/request/:id/approve", authorize("Manager", "HR", "SuperAdmin"), approveLeaveRequest);
 
 /**
  * @route   PUT /api/leave/request/:id/reject
@@ -114,7 +118,7 @@ router.put("/request/:id/approve", approveLeaveRequest);
  * @access  Manager/HR only
  * @body    { reviewedById: string, reviewComments: string }
  */
-router.put("/request/:id/reject", rejectLeaveRequest);
+router.put("/request/:id/reject", authorize("Manager", "HR", "SuperAdmin"), rejectLeaveRequest);
 
 /**
  * @route   PUT /api/leave/request/:id/cancel
