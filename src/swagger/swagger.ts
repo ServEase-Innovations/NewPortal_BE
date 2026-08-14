@@ -21,8 +21,8 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: 'http://localhost:5001',
-        description: 'Development Server',
+        url: '/',
+        description: 'Current server (resolves relative to whatever host/port you loaded Swagger UI from)',
       },
     ],
     components: {

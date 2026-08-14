@@ -43,3 +43,20 @@ export const dailyTaskListQuerySchema = z.object({
   employeeId: z.string().regex(/^\d+$/, "Employee ID must be an integer").optional(),
   status: dailyTaskStatusSchema.optional(),
 });
+
+const currentYear = new Date().getUTCFullYear();
+
+export const dailyTaskHistoryQuerySchema = z.object({
+  employeeId: z
+    .string()
+    .regex(/^\d+$/, "Employee ID must be an integer"),
+  year: z.coerce
+    .number()
+    .int("Year must be an integer")
+    .min(2000, "Year must be 2000 or later")
+    .max(currentYear + 1, `Year must be ${currentYear + 1} or earlier`),
+  status: dailyTaskStatusSchema.optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+});
+ 

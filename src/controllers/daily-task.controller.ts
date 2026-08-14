@@ -14,11 +14,13 @@ import {
   deleteDailyTaskAttachmentService,
   getDailyTaskAttachmentByIdService,
   getDailyTaskByIdService,
+  getDailyTaskHistoryService,
   getDailyTasksService,
   updateDailyTaskService,
 } from "../services/daily-task.service";
 import {
   createDailyTaskSchema,
+  dailyTaskHistoryQuerySchema,
   dailyTaskListQuerySchema,
   updateDailyTaskSchema,
 } from "../validations/daily-task.validation";
@@ -203,6 +205,51 @@ export const getMyDailyTasks = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getDailyTaskHistory = async (req: AuthRequest, res: Response) => {
+  const result = dailyTaskHistoryQuerySchema.safeParse(req.query);
+ 
+  if (!result.success) {
+    return res.status(400).json({
+      message: "Validation failed",
+      errors: result.error.flatten(),
+    });
+  }
+ 
+  const { employeeId, year, status, page, limit } = result.data;
+ 
+  try {
+    const yearStart = dateOnlyToEpoch(`${year}-01-01`);
+    const yearEnd = dateOnlyToEpoch(`${year + 1}-01-01`);
+ 
+    const { tasks, totalCount } = await getDailyTaskHistoryService({
+      employeeId: BigInt(employeeId),
+      yearStart,
+      yearEnd,
+      status,
+      page,
+      limit,
+    });
+ 
+    const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+ 
+    return res.json({
+      employeeId,
+      year,
+      dailyTasks: tasks.map(serializeDailyTask),
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    });
+  } catch (error) {
+    return sendUnexpectedError(res, error, "Failed to fetch daily task history");
+  }
+};
+ 
 export const getDailyTaskById = async (req: AuthRequest, res: Response) => {
   const id = parsePositiveBigInt(req.params.id);
 

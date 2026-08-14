@@ -3,6 +3,7 @@ import {
   createDailyTask,
   deleteDailyTaskAttachment,
   getDailyTaskById,
+  getDailyTaskHistory,
   getDailyTasks,
   getMyDailyTasks,
   updateDailyTask,
@@ -164,6 +165,102 @@ router.get(
  *         description: Employee daily tasks fetched successfully
  */
 router.get("/mine", authenticate, getMyDailyTasks);
+
+/**
+ * @swagger
+ * /daily-tasks/history:
+ *   get:
+ *     summary: View an employee's daily task submission history for a year (paginated)
+ *     description: >
+ *       Available to any authenticated employee (SuperAdmin, Manager, Developer,
+ *       Marketing, CustomStaff, HR). The caller supplies an employeeId and a year;
+ *       the system returns that employee's daily task submissions for the whole
+ *       year, newest first, 10 records per page by default. Use the `page` query
+ *       parameter to move through the history (page=1 for the first 10, page=2
+ *       for the next 10, and so on).
+ *     tags: [Daily Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: "12"
+ *       - in: query
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 2026
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Pending, Completed]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Records per page (max 100). Defaults to 10.
+ *         example: 10
+ *     responses:
+ *       200:
+ *         description: Daily task history fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 employeeId:
+ *                   type: string
+ *                 year:
+ *                   type: integer
+ *                 dailyTasks:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalCount:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *                     hasNextPage:
+ *                       type: boolean
+ *                     hasPreviousPage:
+ *                       type: boolean
+ *       400:
+ *         description: Validation failed
+ *       401:
+ *         description: Authentication required
+ */
+router.get(
+  "/history",
+  authenticate,
+  authorize(
+    "SuperAdmin",
+    "Manager",
+    "Developer",
+    "Marketing",
+    "CustomStaff",
+    "HR"
+  ),
+  getDailyTaskHistory
+);
 
 /**
  * @swagger
