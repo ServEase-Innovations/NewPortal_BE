@@ -12,14 +12,15 @@ export const parseJWTExpiryToMs = (expiryString: string): number => {
   const timeStr = expiryString || defaultTime;
   
   // Parse time string (e.g., "15m", "1h", "24h")
-  const match = timeStr.match(/^(\d+)([smhd])$/);
+  const regex = /^(\d+)([smhd])$/;
+  const match = regex.exec(timeStr);
   if (!match) {
     // Default to 15 minutes if parsing fails
     return 15 * 60 * 1000;
   }
   
   const [, value, unit] = match;
-  const numValue = parseInt(value);
+  const numValue = Number.parseInt(value, 10);
   
   switch (unit) {
     case 's': return numValue * 1000;

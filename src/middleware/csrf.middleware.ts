@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { parseJWTExpiryToMs } from '../utils/time.utils';
 
 declare global {

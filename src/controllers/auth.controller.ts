@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { loginService, generateRefreshToken, formatEmployeeData, refreshTokenService } from "../services/auth.service";
-import { provideCSRFToken, includeCSRFInResponse } from "../middleware/csrf.middleware";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { parseJWTExpiryToMs } from "../utils/time.utils";
 import prisma from "../prisma";

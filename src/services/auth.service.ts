@@ -110,10 +110,10 @@ export const refreshTokenService = async (refreshToken: string) => {
 
     // Check if employee still exists and is active
     const employee = await prisma.employee.findUnique({
-      where: { employeeId: parseInt(decoded.employeeId) }
+      where: { employeeId: Number.parseInt(decoded.employeeId, 10) }
     });
 
-    if (!employee || !employee.isActive) {
+    if (!employee?.isActive) {
       throw new Error('Employee not found or inactive');
     }
 
@@ -138,6 +138,8 @@ export const refreshTokenService = async (refreshToken: string) => {
       employee: formatEmployeeData(employee),
     };
   } catch (error) {
+    // Log the original error for debugging while throwing a safe message
+    console.error('[refreshTokenService] Token refresh failed:', error);
     throw new Error('Invalid or expired refresh token');
   }
 };
