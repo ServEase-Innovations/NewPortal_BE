@@ -39,22 +39,63 @@ export const authenticate = (
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET as string
-    ) as {
-      employeeId: string;
-      username: string;
-      emailAddress: string;
-      assignedRole: EmployeeRole;
-      type?: string;
-    };
+    ) as any; // Start with any, then validate
 
-    // Reject refresh tokens - they should not be used for API access
-    if (decoded.type === 'refresh') {
+    // Validate JWT payload structure and types
+    if (!decoded || typeof decoded !== 'object') {
       return res.status(401).json({
-        message: "Invalid token type. Refresh tokens cannot be used for API access.",
+        message: "Invalid token payload structure",
       });
     }
 
-    (req as AuthRequest).employee = decoded;
+    // Validate required fields and types
+    if (!decoded.employeeId || typeof decoded.employeeId !== 'string') {
+      return res.status(401).json({
+        message: "Invalid or missing employee ID in token",
+      });
+    }
+
+    if (!decoded.username || typeof decoded.username !== 'string') {
+      return res.status(401).json({
+        message: "Invalid or missing username in token",
+      });
+    }
+
+    if (!decoded.emailAddress || typeof decoded.emailAddress !== 'string') {
+      return res.status(401).json({
+        message: "Invalid or missing email address in token",
+      });
+    }
+
+    if (!decoded.assignedRole || typeof decoded.assignedRole !== 'string') {
+      return res.status(401).json({
+        message: "Invalid or missing role in token",
+      });
+    }
+
+    // Validate employee ID format (should be numeric string for BigInt conversion)
+    if (!/^\d+$/.test(decoded.employeeId)) {
+      return res.status(401).json({
+        message: "Invalid employee ID format in token",
+      });
+    }
+
+    // Only accept access tokens for API authentication
+    if (decoded.type !== 'access') {
+      return res.status(401).json({
+        message: "Invalid token type. Only access tokens are allowed for API access.",
+      });
+    }
+
+    // Build clean employee object with validated fields only
+    const validatedEmployee = {
+      employeeId: decoded.employeeId,
+      username: decoded.username,
+      emailAddress: decoded.emailAddress,
+      assignedRole: decoded.assignedRole as EmployeeRole
+    };
+
+    (req as AuthRequest).employee = validatedEmployee;
     next();
   } catch (error) {
     return res.status(401).json({

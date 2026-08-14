@@ -102,10 +102,24 @@ export const login = async (
     // Log the actual error for debugging
     console.error('[Login] Error:', error);
     
-    // Return user-friendly message (loginService already provides safe messages)
-    res.status(401).json({
-      message: error.message || "Invalid credentials",
-    });
+    // Only return safe, expected authentication errors
+    // For unexpected errors, return generic message to prevent information leakage
+    const isKnownAuthError = error.message && (
+      error.message.includes('Invalid credentials') ||
+      error.message.includes('Employee not found') ||
+      error.message.includes('Account is inactive')
+    );
+    
+    if (isKnownAuthError) {
+      res.status(401).json({
+        message: error.message,
+      });
+    } else {
+      // Generic message for unexpected errors (DB failures, etc.)
+      res.status(500).json({
+        message: "Authentication service temporarily unavailable",
+      });
+    }
   }
 };
 
@@ -179,9 +193,26 @@ export const getCurrentUser = async (
       });
     }
 
+    // Validate and safely convert employeeId
+    let employeeId: bigint;
+    try {
+      // Validate that employeeId is a numeric string
+      if (!/^\d+$/.test(employeeFromToken.employeeId)) {
+        return res.status(401).json({
+          message: "Invalid employee ID format in token",
+        });
+      }
+      
+      employeeId = BigInt(employeeFromToken.employeeId);
+    } catch (error) {
+      return res.status(401).json({
+        message: "Invalid employee ID in token",
+      });
+    }
+
     // Fetch full employee data from database
     const employee = await prisma.employee.findUnique({
-      where: { employeeId: BigInt(employeeFromToken.employeeId) },
+      where: { employeeId: employeeId },
     });
 
     if (!employee) {

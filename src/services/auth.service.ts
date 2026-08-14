@@ -66,6 +66,7 @@ export const loginService = async (
   // Generate access token with configurable expiry (default 15m)
   const token = jwt.sign(
     {
+      type: "access", // REQUIRED: Add token type for validation
       employeeId: employee.employeeId.toString(),
       username: employee.username,
       emailAddress: employee.emailAddress,
@@ -108,18 +109,41 @@ export const refreshTokenService = async (refreshToken: string) => {
       throw new Error('Invalid token type');
     }
 
+    // Validate refresh token payload
+    let employeeId: number;
+    try {
+      if (!decoded.employeeId || !/^\d+$/.test(decoded.employeeId)) {
+        throw new Error('Invalid employee ID format in refresh token');
+      }
+      employeeId = Number.parseInt(decoded.employeeId, 10);
+      if (isNaN(employeeId) || employeeId <= 0) {
+        throw new Error('Invalid employee ID value in refresh token');
+      }
+    } catch (error) {
+      console.error('[refreshTokenService] Invalid employee ID:', error);
+      throw new Error('Invalid refresh token payload');
+    }
+
     // Check if employee still exists and is active
     const employee = await prisma.employee.findUnique({
-      where: { employeeId: Number.parseInt(decoded.employeeId, 10) }
+      where: { employeeId: BigInt(employeeId) } // Use BigInt for consistency
     });
 
     if (!employee?.isActive) {
       throw new Error('Employee not found or inactive');
     }
 
+    // SECURITY: Validate that the refresh token matches the one stored in database
+    // This prevents use of old/rotated tokens
+    if (employee.refresh_token !== refreshToken) {
+      console.error('[refreshTokenService] Token rotation violation - token does not match stored token');
+      throw new Error('Refresh token has been rotated or revoked');
+    }
+
     // Generate new access token with configurable expiry (default 15m)
     const newAccessToken = jwt.sign(
       {
+        type: "access", // REQUIRED: Add token type for validation
         employeeId: employee.employeeId.toString(),
         username: employee.username,
         emailAddress: employee.emailAddress,
@@ -131,6 +155,15 @@ export const refreshTokenService = async (refreshToken: string) => {
 
     // Generate new refresh token (token rotation for security)
     const newRefreshToken = generateRefreshToken(employee.employeeId.toString());
+    
+    // SECURITY: Implement actual token rotation by invalidating old refresh token
+    await prisma.employee.update({
+      where: { employeeId: employee.employeeId },
+      data: { 
+        refresh_token: newRefreshToken, // Store new token, invalidates old one
+        last_login: BigInt(Date.now())
+      }
+    });
 
     return {
       accessToken: newAccessToken,
@@ -179,6 +212,13 @@ export const registerService = async (data: {
   // Hash password
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
+  // SECURITY: Validate assignedRole enum value
+  const { EmployeeRole } = await import('@prisma/client');
+  const validRoles = Object.values(EmployeeRole);
+  if (!validRoles.includes(data.assignedRole as any)) {
+    throw new Error(`Invalid role. Valid roles: ${validRoles.join(', ')}`);
+  }
+
   // Create employee with epoch timestamp for joinedAt
   const employee = await prisma.employee.create({
     data: {
@@ -186,7 +226,7 @@ export const registerService = async (data: {
       emailAddress: data.emailAddress,
       username: username,
       password: hashedPassword,
-      assignedRole: data.assignedRole as any,
+      assignedRole: data.assignedRole as any, // Safe after validation above
       assignedDepartment: data.assignedDepartment,
       baseSalary: data.baseSalary || 0,
       allowances: data.allowances || 0,

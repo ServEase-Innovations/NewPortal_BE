@@ -46,7 +46,7 @@ app.use(cors({
   },
   credentials: true, // Allow cookies to be sent
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'], // Added CSRF token header
 }));
 
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));

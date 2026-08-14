@@ -21,11 +21,28 @@ const verifyCSRFToken = (sessionToken: string, requestToken: string): boolean =>
     return false;
   }
   
-  // Use timing-safe comparison to prevent timing attacks
-  return crypto.timingSafeEqual(
-    Buffer.from(sessionToken, 'hex'),
-    Buffer.from(requestToken, 'hex')
-  );
+  try {
+    // Validate token format and length before comparison
+    if (sessionToken.length !== 64 || requestToken.length !== 64) {
+      return false; // CSRF tokens should be exactly 64 hex characters (32 bytes * 2)
+    }
+    
+    // Validate hex format
+    if (!/^[a-fA-F0-9]{64}$/.test(sessionToken) || !/^[a-fA-F0-9]{64}$/.test(requestToken)) {
+      return false;
+    }
+    
+    // Convert to buffers - now safe since we validated format and length
+    const sessionBuffer = Buffer.from(sessionToken, 'hex');
+    const requestBuffer = Buffer.from(requestToken, 'hex');
+    
+    // Use timing-safe comparison to prevent timing attacks
+    return crypto.timingSafeEqual(sessionBuffer, requestBuffer);
+  } catch (error) {
+    // Any error in token processing should be treated as invalid token
+    console.error('CSRF token validation error:', error);
+    return false;
+  }
 };
 
 // Check if CSRF protection is needed based on sameSite policy
@@ -42,28 +59,44 @@ const isCSRFProtectionNeeded = (): boolean => {
     return process.env.ENABLE_CSRF_PROTECTION === 'true';
   }
   
+  // Explicit configuration takes precedence - never fail open on security
+  if (process.env.ENABLE_CSRF_PROTECTION !== undefined) {
+    return process.env.ENABLE_CSRF_PROTECTION === 'true';
+  }
+  
   // Auto-detect: if no policy set and we detect cross-site deployment
   if (!policy) {
     const frontendUrl = process.env.FRONTEND_URL || '';
     const backendUrl = process.env.BACKEND_URL || '';
     
-    if (frontendUrl && backendUrl) {
-      try {
-        const frontendDomain = new URL(frontendUrl).hostname;
-        const backendDomain = new URL(backendUrl).hostname;
-        
-        // If cross-site, enable CSRF protection
-        const isCrossSite = !frontendDomain.endsWith(backendDomain.split('.').slice(-2).join('.')) &&
-                           !backendDomain.endsWith(frontendDomain.split('.').slice(-2).join('.'));
-        
-        return isCrossSite;
-      } catch {
-        return false;
+    // If URLs are not properly configured, fail secure (enable CSRF protection)
+    if (!frontendUrl || !backendUrl) {
+      console.warn('CSRF: Frontend/Backend URLs not configured, enabling CSRF protection for security');
+      return true;
+    }
+    
+    try {
+      const frontendDomain = new URL(frontendUrl).hostname;
+      const backendDomain = new URL(backendUrl).hostname;
+      
+      // Simple same-host check (more reliable than suffix matching)
+      // If different hosts, enable CSRF protection
+      const isCrossSite = frontendDomain !== backendDomain;
+      
+      if (isCrossSite) {
+        console.log(`CSRF: Cross-site deployment detected (${frontendDomain} -> ${backendDomain}), enabling CSRF protection`);
       }
+      
+      return isCrossSite;
+    } catch (error) {
+      // URL parsing failed - fail secure by enabling CSRF protection
+      console.error('CSRF: Failed to parse URLs, enabling CSRF protection for security:', error);
+      return true;
     }
   }
   
-  return false;
+  // Default: enable CSRF protection for security (fail secure)
+  return true;
 };
 
 // CSRF token generation endpoint middleware

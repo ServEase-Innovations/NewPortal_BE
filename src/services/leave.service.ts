@@ -82,49 +82,51 @@ export const initializeLeaveBalancesService = async (
   const policy = await getOrCreateLeavePolicyService(year);
   const now = BigInt(Date.now());
 
-  // Check if balances already exist
-  const existing = await prisma.leaveBalance.findMany({
-    where: { employeeId, year },
+  // Use transaction to prevent race conditions
+  return await prisma.$transaction(async (tx) => {
+    // Check if balances already exist within transaction
+    const existing = await tx.leaveBalance.findMany({
+      where: { employeeId, year },
+    });
+
+    if (existing.length > 0) {
+      return existing;
+    }
+
+    // Create both balances atomically
+    const [privilegeBalance, flexiBalance] = await Promise.all([
+      tx.leaveBalance.create({
+        data: {
+          employeeId,
+          year,
+          leaveType: LeaveType.Privilege,
+          totalAllocated: policy.privilegeLeaveDays,
+          totalUsed: 0,
+          totalPending: 0,
+          totalAvailable: policy.privilegeLeaveDays,
+          carriedForward: 0,
+          lastUpdated: now,
+          createdAt: now,
+        },
+      }),
+      tx.leaveBalance.create({
+        data: {
+          employeeId,
+          year,
+          leaveType: LeaveType.Casual,
+          totalAllocated: policy.flexiLeaveDays,
+          totalUsed: 0,
+          totalPending: 0,
+          totalAvailable: policy.flexiLeaveDays,
+          carriedForward: 0,
+          lastUpdated: now,
+          createdAt: now,
+        },
+      }),
+    ]);
+
+    return [privilegeBalance, flexiBalance];
   });
-
-  if (existing.length > 0) {
-    return existing;
-  }
-
-  // Create Privilege leave balance (18 days)
-  const privilegeBalance = await prisma.leaveBalance.create({
-    data: {
-      employeeId,
-      year,
-      leaveType: LeaveType.Privilege,
-      totalAllocated: policy.privilegeLeaveDays,
-      totalUsed: 0,
-      totalPending: 0,
-      totalAvailable: policy.privilegeLeaveDays,
-      carriedForward: 0,
-      lastUpdated: now,
-      createdAt: now,
-    },
-  });
-
-  // Create Flexi leave balance (6 days total for Casual + Sick + Paternity)
-  // We'll track as a single "Casual" type that covers all flexi leave reasons
-  const flexiBalance = await prisma.leaveBalance.create({
-    data: {
-      employeeId,
-      year,
-      leaveType: LeaveType.Casual,
-      totalAllocated: policy.flexiLeaveDays,
-      totalUsed: 0,
-      totalPending: 0,
-      totalAvailable: policy.flexiLeaveDays,
-      carriedForward: 0,
-      lastUpdated: now,
-      createdAt: now,
-    },
-  });
-
-  return [privilegeBalance, flexiBalance];
 };
 
 /**

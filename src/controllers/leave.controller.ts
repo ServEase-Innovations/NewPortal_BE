@@ -306,7 +306,19 @@ export const getLeaveRequests = async (req: Request, res: Response) => {
     const employeeIdParam = req.query.employeeId;
     const employeeId = typeof employeeIdParam === 'string' ? employeeIdParam : undefined;
     const statusParam = req.query.status;
-    const status = typeof statusParam === 'string' ? statusParam as LeaveRequestStatus : undefined;
+    
+    // SECURITY: Validate enum value instead of unsafe casting
+    let status: LeaveRequestStatus | undefined = undefined;
+    if (typeof statusParam === 'string') {
+      const validStatuses = Object.values(LeaveRequestStatus);
+      if (validStatuses.includes(statusParam as LeaveRequestStatus)) {
+        status = statusParam as LeaveRequestStatus;
+      } else {
+        return res.status(400).json({ 
+          message: `Invalid status. Valid values: ${validStatuses.join(', ')}` 
+        });
+      }
+    }
 
     if (employeeId) {
       // Get leave requests for specific employee
@@ -394,9 +406,16 @@ export const getPendingLeaveRequestsForManager = async (
 
 export const approveLeaveRequest = async (req: Request, res: Response) => {
   try {
+    // SECURITY: Get reviewedById from authenticated user, NOT from request body
+    const authenticatedUser = (req as any).user;
+    if (!authenticatedUser || !authenticatedUser.employeeId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
     const result = approveLeaveRequestSchema.safeParse({
       leaveRequestId: req.params.id,
-      ...req.body,
+      reviewedById: authenticatedUser.employeeId, // Use authenticated user ID
+      reviewComments: req.body.reviewComments, // Only allow comments from body
     });
 
     if (!result.success) {
@@ -423,9 +442,16 @@ export const approveLeaveRequest = async (req: Request, res: Response) => {
 
 export const rejectLeaveRequest = async (req: Request, res: Response) => {
   try {
+    // SECURITY: Get reviewedById from authenticated user, NOT from request body
+    const authenticatedUser = (req as any).user;
+    if (!authenticatedUser || !authenticatedUser.employeeId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
     const result = rejectLeaveRequestSchema.safeParse({
       leaveRequestId: req.params.id,
-      ...req.body,
+      reviewedById: authenticatedUser.employeeId, // Use authenticated user ID
+      reviewComments: req.body.reviewComments, // Only allow comments from body
     });
 
     if (!result.success) {
@@ -452,9 +478,16 @@ export const rejectLeaveRequest = async (req: Request, res: Response) => {
 
 export const cancelLeaveRequest = async (req: Request, res: Response) => {
   try {
+    // SECURITY: Get employeeId from authenticated user, NOT from request body
+    const authenticatedUser = (req as any).user;
+    if (!authenticatedUser || !authenticatedUser.employeeId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
     const result = cancelLeaveRequestSchema.safeParse({
       leaveRequestId: req.params.id,
-      ...req.body,
+      employeeId: authenticatedUser.employeeId, // Use authenticated user ID
+      cancellationReason: req.body.cancellationReason, // Only allow reason from body
     });
 
     if (!result.success) {
