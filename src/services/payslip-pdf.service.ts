@@ -1,5 +1,16 @@
 import PDFDocument from "pdfkit";
 
+// Input sanitization for PDF generation to prevent XSS
+const sanitizeForPdf = (input: unknown): string => {
+  if (typeof input !== 'string') return String(input || '');
+  
+  return input
+    .replace(/[<>]/g, '') // Remove HTML brackets
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .trim()
+    .substring(0, 200); // Limit length to prevent buffer issues
+};
+
 const formatMoney = (value: unknown, currency: string): string => {
   const amount = Number(value);
   try {
@@ -51,13 +62,13 @@ export const createPayslipPdfBuffer = (payslip: any): Promise<Buffer> =>
     document.font("Helvetica-Bold").fontSize(11).text("Employee Details");
     document.moveDown(0.5);
     const employeeY = document.y;
-    drawLineItem(document, "Payslip number", payslip.payslipNumber, employeeY);
-    drawLineItem(document, "Employee", payslip.employeeNameSnapshot, employeeY + 18);
-    drawLineItem(document, "Employee ID", payslip.employeeId.toString(), employeeY + 36);
-    drawLineItem(document, "Department", payslip.employeeDepartmentSnapshot, employeeY + 54);
-    drawLineItem(document, "Role", payslip.employeeRoleSnapshot, employeeY + 72);
+    drawLineItem(document, "Payslip number", sanitizeForPdf(payslip.payslipNumber), employeeY);
+    drawLineItem(document, "Employee", sanitizeForPdf(payslip.employeeNameSnapshot), employeeY + 18);
+    drawLineItem(document, "Employee ID", sanitizeForPdf(payslip.employeeId.toString()), employeeY + 36);
+    drawLineItem(document, "Department", sanitizeForPdf(payslip.employeeDepartmentSnapshot), employeeY + 54);
+    drawLineItem(document, "Role", sanitizeForPdf(payslip.employeeRoleSnapshot), employeeY + 72);
     if (payslip.bankAccountMasked) {
-      drawLineItem(document, "Bank account", payslip.bankAccountMasked, employeeY + 90);
+      drawLineItem(document, "Bank account", sanitizeForPdf(payslip.bankAccountMasked), employeeY + 90);
     }
 
     document.y = employeeY + (payslip.bankAccountMasked ? 125 : 107);
@@ -78,7 +89,7 @@ export const createPayslipPdfBuffer = (payslip: any): Promise<Buffer> =>
     for (const earning of payslip.earnings || []) {
       drawLineItem(
         document,
-        earning.earningType,
+        sanitizeForPdf(earning.earningType),
         formatMoney(earning.amount, currency),
         currentY
       );
@@ -98,7 +109,7 @@ export const createPayslipPdfBuffer = (payslip: any): Promise<Buffer> =>
     for (const deduction of payslip.deductions || []) {
       drawLineItem(
         document,
-        deduction.deductionType,
+        sanitizeForPdf(deduction.deductionType),
         formatMoney(deduction.amount, currency),
         currentY
       );

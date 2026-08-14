@@ -163,6 +163,55 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        BulkPayslipResult: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              description: 'Whether the bulk operation was successful',
+              example: true,
+            },
+            totalEmployees: {
+              type: 'number',
+              description: 'Total number of active employees processed',
+              example: 25,
+            },
+            successfulPayslips: {
+              type: 'number',
+              description: 'Number of payslips generated successfully',
+              example: 24,
+            },
+            failedPayslips: {
+              type: 'number',
+              description: 'Number of payslips that failed to generate',
+              example: 1,
+            },
+            generationTimeMs: {
+              type: 'number',
+              description: 'Total time taken for the operation in milliseconds',
+              example: 5430,
+            },
+            errors: {
+              type: 'array',
+              description: 'List of errors encountered during generation',
+              items: {
+                type: 'object',
+                properties: {
+                  employeeId: {
+                    type: 'string',
+                    description: 'Employee ID that encountered the error',
+                    example: '5',
+                  },
+                  error: {
+                    type: 'string',
+                    description: 'Error message',
+                    example: 'Insufficient salary data for payslip calculation',
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     security: [
@@ -201,6 +250,10 @@ const options: swaggerJsdoc.Options = {
       {
         name: 'Leave Management',
         description: 'Leave requests, balances, and approvals (requires authentication and role-based authorization)',
+      },
+      {
+        name: 'Payslip Automation',
+        description: 'Automatic payslip generation, scheduling, and bulk operations (requires SuperAdmin/Manager access)',
       },
     ],
   },

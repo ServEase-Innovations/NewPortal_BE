@@ -31,7 +31,7 @@ const payrollAdmins = authorize("SuperAdmin", "Manager");
  *       period start (e.g. the employee's joining date), the payable
  *       period is prorated from that date onward.
  *     tags: [Payslips]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ cookieAuth: [] }]
  *     requestBody:
  *       required: true
  *       content:
@@ -57,7 +57,7 @@ router.post("/generate", authenticate, payrollAdmins, generatePayslipForEmployee
  *   get:
  *     summary: List and filter payslips (SuperAdmin or Manager)
  *     tags: [Payslips]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ cookieAuth: [] }]
  *     parameters:
  *       - in: query
  *         name: employeeId
@@ -86,7 +86,7 @@ router.get("/", authenticate, payrollAdmins, getPayslips);
  *       Approved/Paid payslips for the current or previous month.
  *       SuperAdmin/Manager are not subject to that restriction.
  *     tags: [Payslips]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ cookieAuth: [] }]
  *     parameters:
  *       - in: query
  *         name: month
@@ -113,7 +113,7 @@ router.get("/mine", authenticate, getMyPayslips);
  *       roles must always supply month & year, may only query themselves,
  *       and are limited to the current or previous month.
  *     tags: [Payslips]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ cookieAuth: [] }]
  *     parameters:
  *       - in: path
  *         name: employeeId
@@ -135,7 +135,7 @@ router.get("/mine", authenticate, getMyPayslips);
  *   patch:
  *     summary: Edit a draft payslip by employeeId + period (SuperAdmin or Manager)
  *     tags: [Payslips]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ cookieAuth: [] }]
  *     parameters:
  *       - in: path
  *         name: employeeId
@@ -198,7 +198,7 @@ router.patch("/employee/:employeeId", authenticate, payrollAdmins, updatePayslip
  *       previous month. SuperAdmin/Manager may download any employee's
  *       payslip PDF for any period.
  *     tags: [Payslips]
- *     security: [{ bearerAuth: [] }]
+ *     security: [{ cookieAuth: [] }]
  *     parameters:
  *       - in: path
  *         name: employeeId
