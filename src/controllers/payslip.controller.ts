@@ -19,6 +19,23 @@ import {
 } from "../validations/payslip.validation";
 import { currentDateOnly, epochDayToDateOnly, epochToIso, nowEpoch } from "../utils/epoch";
 
+// Security event logging for payslip access
+const logSecurityEvent = (
+  event: string, 
+  req: AuthRequest, 
+  details?: Record<string, any>
+) => {
+  console.error(`[SECURITY] Payslip ${event}`, {
+    timestamp: new Date().toISOString(),
+    employeeId: req.employee?.employeeId,
+    username: req.employee?.username,
+    role: req.employee?.assignedRole,
+    ip: req.ip || req.socket?.remoteAddress,
+    userAgent: req.get('User-Agent'),
+    ...details
+  });
+};
+
 // SuperAdmin and Manager have full access to every payslip/payroll workflow
 // (generation, approval, mark-paid, editing, viewing all employees) and may
 // generate payslips as many times as needed.
@@ -139,8 +156,15 @@ export const serializePayslip = (payslip: any) => ({
   })),
 });
 
-const sendError = (res: Response, error: unknown, fallbackMessage: string) => {
+const sendError = (res: Response, error: unknown, fallbackMessage: string, req?: AuthRequest) => {
   if (error instanceof PayrollDomainError) {
+    if (error.statusCode === 403 && req) {
+      logSecurityEvent('ACCESS_DENIED', req, { 
+        error: error.message,
+        endpoint: req.path,
+        method: req.method 
+      });
+    }
     return res.status(error.statusCode).json({ message: error.message });
   }
 
@@ -155,7 +179,16 @@ const sendError = (res: Response, error: unknown, fallbackMessage: string) => {
   }
 
   const details = error instanceof Error ? error.message : String(error);
-  console.error(fallbackMessage, details);
+  console.error(`[ERROR] ${fallbackMessage}:`, details);
+  
+  if (req) {
+    logSecurityEvent('OPERATION_ERROR', req, { 
+      error: fallbackMessage,
+      endpoint: req.path,
+      details: process.env.NODE_ENV === "development" ? details : undefined
+    });
+  }
+  
   return res.status(500).json({
     message: fallbackMessage,
     error: process.env.NODE_ENV === "development" ? details : undefined,
@@ -177,7 +210,7 @@ export const getPayslips = async (req: AuthRequest, res: Response) => {
     });
     return res.json({ count: payslips.length, payslips: payslips.map(serializePayslip) });
   } catch (error) {
-    return sendError(res, error, "Failed to fetch payslips");
+    return sendError(res, error, "Failed to fetch payslips", req);
   }
 };
 
@@ -204,7 +237,7 @@ export const getMyPayslips = async (req: AuthRequest, res: Response) => {
     });
     return res.json({ count: payslips.length, payslips: payslips.map(serializePayslip) });
   } catch (error) {
-    return sendError(res, error, "Failed to fetch your payslips");
+    return sendError(res, error, "Failed to fetch your payslips", req);
   }
 };
 
@@ -236,7 +269,7 @@ export const generatePayslipForEmployee = async (req: AuthRequest, res: Response
       payslip: payslip ? serializePayslip(payslip) : undefined,
     });
   } catch (error) {
-    return sendError(res, error, "Failed to generate payslip");
+    return sendError(res, error, "Failed to generate payslip", req);
   }
 };
 
@@ -252,6 +285,10 @@ export const getPayslipsByEmployee = async (req: AuthRequest, res: Response) => 
   if (!employeeId) return res.status(400).json({ message: "Invalid employee ID" });
 
   if (!isPayrollAdmin(req) && !isOwner(req, employeeId)) {
+    logSecurityEvent('UNAUTHORIZED_PAYSLIP_ACCESS_ATTEMPT', req, { 
+      targetEmployeeId: employeeId.toString(),
+      requestedPath: req.path 
+    });
     return res.status(403).json({ message: "You cannot view this employee's payslips" });
   }
 
@@ -294,7 +331,7 @@ export const getPayslipsByEmployee = async (req: AuthRequest, res: Response) => 
     });
     return res.json({ count: payslips.length, payslips: payslips.map(serializePayslip) });
   } catch (error) {
-    return sendError(res, error, "Failed to fetch payslips");
+    return sendError(res, error, "Failed to fetch payslips", req);
   }
 };
 
@@ -331,7 +368,7 @@ export const updatePayslipByEmployee = async (req: AuthRequest, res: Response) =
       payslip: payslip ? serializePayslip(payslip) : undefined,
     });
   } catch (error) {
-    return sendError(res, error, "Failed to update payslip");
+    return sendError(res, error, "Failed to update payslip", req);
   }
 };
 
@@ -345,10 +382,6 @@ export const downloadPayslipPdfByEmployee = async (req: AuthRequest, res: Respon
   const employeeId = parsePositiveBigInt(req.params.employeeId);
   if (!employeeId) return res.status(400).json({ message: "Invalid employee ID" });
 
-  if (!isPayrollAdmin(req) && !isOwner(req, employeeId)) {
-    return res.status(403).json({ message: "You cannot download this employee's payslip" });
-  }
-
   const periodResult = employeePayslipPeriodSchema.safeParse(req.query);
   if (!periodResult.success) {
     return res.status(400).json({ message: "Validation failed", errors: periodResult.error.flatten() });
@@ -356,6 +389,16 @@ export const downloadPayslipPdfByEmployee = async (req: AuthRequest, res: Respon
 
   const month = Number(periodResult.data.month);
   const year = Number(periodResult.data.year);
+
+  if (!isPayrollAdmin(req) && !isOwner(req, employeeId)) {
+    logSecurityEvent('UNAUTHORIZED_PDF_DOWNLOAD_ATTEMPT', req, { 
+      targetEmployeeId: employeeId.toString(),
+      month,
+      year 
+    });
+    return res.status(403).json({ message: "You cannot download this employee's payslip" });
+  }
+
   const admin = isPayrollAdmin(req);
 
   if (!admin && !isCurrentOrPreviousPeriod(month, year)) {
@@ -379,6 +422,6 @@ export const downloadPayslipPdfByEmployee = async (req: AuthRequest, res: Respon
     );
     return res.send(pdf);
   } catch (error) {
-    return sendError(res, error, "Failed to generate payslip PDF");
+    return sendError(res, error, "Failed to generate payslip PDF", req);
   }
 };
