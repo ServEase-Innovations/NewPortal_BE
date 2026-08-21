@@ -52,6 +52,15 @@ export interface DailyTaskFilters {
   status?: DailyTaskStatus;
 }
 
+export interface DailyTaskHistoryFilters {
+  employeeId: bigint;
+  yearStart: bigint;
+  yearEnd: bigint;
+  status?: DailyTaskStatus;
+  page: number;
+  limit: number;
+}
+
 export interface UpdateDailyTaskInput {
   workDescription?: string;
   status?: DailyTaskStatus;
@@ -148,6 +157,51 @@ export const getDailyTasksService = (
       },
     ],
   });
+};
+
+export const getDailyTaskHistoryService = async (
+  filters: DailyTaskHistoryFilters
+) => {
+  const where: Prisma.DailyTaskSubmissionWhereInput = {
+    employeeId: filters.employeeId,
+    submissionDate: {
+      gte: filters.yearStart,
+      lt: filters.yearEnd,
+    },
+  };
+
+  if (filters.status !== undefined) {
+    where.status = filters.status;
+  }
+
+  const skip = (filters.page - 1) * filters.limit;
+
+  const [tasks, totalCount] = await prisma.$transaction([
+    prisma.dailyTaskSubmission.findMany({
+      where,
+
+      include: dailyTaskInclude,
+
+      orderBy: [
+        {
+          submissionDate: "desc",
+        },
+        {
+          submittedAt: "desc",
+        },
+        {
+          dailyTaskSubmissionId: "desc",
+        },
+      ],
+
+      skip,
+      take: filters.limit,
+    }),
+
+    prisma.dailyTaskSubmission.count({ where }),
+  ]);
+
+  return { tasks, totalCount };
 };
 
 export const getDailyTaskByIdService = (
