@@ -5,6 +5,7 @@ import {
   deleteEmployeeService, 
   getEmployeeByIdService, 
   getEmployeesService, 
+  searchEmployeesService,
   updateEmployeeService 
 } from "../services/employee.service";
 import { createEmployeeSchema } from "../validations/employee.validation";
@@ -205,6 +206,41 @@ export const getEmployees = async (
 
     res.status(500).json({
       message: "Failed to fetch employees",
+    });
+  }
+};
+
+// GET /employees/search?q=<n>
+// Fuzzy/partial search powered by pg_trgm. Matches single letters, partial
+// words, or full names with typos on the name field, and also matches
+// against assignedRole (SuperAdmin, Manager, Developer, Marketing,
+// CustomStaff, HR) so a query like "Developer" or "hr" returns everyone in
+// that role. Ranked by name similarity score.
+export const searchEmployees = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+    if (!q) {
+      return res.status(400).json({
+        message: "Query parameter 'q' is required, e.g. /employees/search?q=John or /employees/search?q=Developer",
+      });
+    }
+
+    const employees = await searchEmployeesService(q);
+
+    res.json({
+      query: q,
+      count: employees.length,
+      employees: serializeEmployees(employees),
+    });
+  } catch (error: any) {
+    console.error('Search employees error:', error);
+    res.status(500).json({
+      message: "Failed to search employees",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

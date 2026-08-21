@@ -4,6 +4,7 @@ import {
   createEmployee,
   getEmployees,
   getEmployeeById,
+  searchEmployees,
   updateEmployee,
   deleteEmployee,
   registerEmployee,
@@ -277,6 +278,46 @@ router.get(
   authenticate,
   authorize("SuperAdmin", "HR", "Manager"),
   getEmployees
+);
+
+/**
+ * @swagger
+ * /employees/search:
+ *   get:
+ *     summary: Fuzzy/partial search employees by name or role
+ *     description: >
+ *       Searches employees by full name AND assigned role using the pg_trgm
+ *       Postgres extension. Matches single letters, partial words, full
+ *       names, or role names (SuperAdmin, Manager, Developer, Marketing,
+ *       CustomStaff, HR), and tolerates typos, ranked by similarity (best
+ *       match first). Accessible by any authenticated employee, regardless
+ *       of role.
+ *     tags:
+ *       - Employees
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Search text - a single letter, partial word, full name, or role name
+ *         example: dev
+ *     responses:
+ *       200:
+ *         description: Matching employees, ranked by similarity
+ *       400:
+ *         description: Missing 'q' query parameter
+ *       401:
+ *         description: Authentication required
+ *       500:
+ *         description: Server error
+ */
+router.get(
+  "/search",
+  authenticate,
+  searchEmployees
 );
 
 /**
