@@ -7,26 +7,13 @@ const options: swaggerJsdoc.Options = {
     openapi: '3.0.0',
     info: {
       title: 'Employee Management API',
-      version: '2.0.0',
-      description: `Employee Management System with Enhanced Authentication Security
+      version: '1.0.0',
+      description: `Employee Management System with HR Role Support
       
-**Authentication:**
-- **Primary**: HTTP-only cookie-based JWT authentication (recommended)
-- **Fallback**: Bearer token authentication (for backward compatibility)
-- **Refresh Tokens**: Automatic token rotation with 7-day refresh tokens
-- **CSRF Protection**: Enabled for cross-site deployments
-
-**Security Features:**
-- Short-lived access tokens (15 minutes by default)
-- HTTP-only cookies prevent XSS attacks
-- Configurable SameSite policy for cross-origin support
-- Role-based authorization on sensitive endpoints
-
 **Important Notes:**
 - **Employee IDs**: Auto-incremented integers (1, 2, 3...) returned as strings in JSON
 - **Timestamps**: All date/time fields are stored internally as epoch milliseconds (BigInt) but are automatically converted to/from ISO 8601 format in API requests and responses
-- **Date Format**: Use ISO 8601 format for all date/time fields (e.g., "2026-07-10T14:30:00.000Z")
-- **Authentication**: Cookies are set automatically on login and used for subsequent requests`,
+- **Date Format**: Use ISO 8601 format for all date/time fields (e.g., "2026-07-10T14:30:00.000Z")`,
       contact: {
         name: 'API Support',
         email: 'support@company.com',
@@ -34,117 +21,63 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: 'http://localhost:4000',
-        description: 'Development Server',
-      },
-      {
-        url: 'http://localhost:5001',
-        description: 'Alternative Development Server',
+        url: '/',
+        description: 'Current server (resolves relative to whatever host/port you loaded Swagger UI from)',
       },
     ],
     components: {
       securitySchemes: {
-        cookieAuth: {
-          type: 'apiKey',
-          in: 'cookie',
-          name: 'accessToken',
-          description: 'HTTP-only cookie containing JWT access token (primary authentication method)',
-        },
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Bearer token authentication (fallback for API clients)',
-        },
-        csrfToken: {
-          type: 'apiKey',
-          in: 'header',
-          name: 'X-CSRF-Token',
-          description: 'CSRF token for state-changing operations (required when CSRF protection is enabled)',
+          description: 'Enter your JWT token',
         },
       },
+      // ✅ ADDED: Missing schemas section
       schemas: {
-        Employee: {
-          type: 'object',
-          properties: {
-            employeeId: {
-              type: 'string',
-              description: 'Unique employee identifier',
-              example: '1',
-            },
-            fullName: {
-              type: 'string',
-              description: 'Full name of the employee',
-              example: 'John Doe',
-            },
-            username: {
-              type: 'string',
-              description: 'Unique username for login',
-              example: 'johndoe',
-            },
-            emailAddress: {
-              type: 'string',
-              format: 'email',
-              description: 'Employee email address',
-              example: 'john.doe@company.com',
-            },
-            assignedRole: {
-              type: 'string',
-              enum: ['SuperAdmin', 'HR', 'Manager', 'Developer', 'Marketing', 'CustomStaff'],
-              description: 'Employee role in the system',
-              example: 'Developer',
-            },
-            assignedDepartment: {
-              type: 'string',
-              description: 'Department where employee works',
-              example: 'Engineering',
-            },
-            isActive: {
-              type: 'boolean',
-              description: 'Whether the employee account is active',
-              example: true,
-            },
-            baseSalary: {
-              type: 'number',
-              description: 'Base salary amount',
-              example: 50000,
-            },
-            allowances: {
-              type: 'number',
-              description: 'Additional allowances',
-              example: 5000,
-            },
-            deductions: {
-              type: 'number',
-              description: 'Salary deductions',
-              example: 1000,
-            },
-            joinedAt: {
-              type: 'string',
-              description: 'Employee join date (epoch timestamp as string)',
-              example: '1672531200000',
-            },
-            lastLogin: {
-              type: 'string',
-              description: 'Last login timestamp (epoch timestamp as string)',
-              example: '1672617600000',
-            },
-          },
-        },
+        // Authentication schemas
         AuthResponse: {
           type: 'object',
           properties: {
-            message: {
+            token: {
               type: 'string',
-              example: 'Login successful',
+              description: 'JWT access token',
             },
-            employee: {
-              $ref: '#/components/schemas/Employee',
-            },
-            csrfToken: {
-              type: 'string',
-              description: 'CSRF token (only included when CSRF protection is enabled)',
-              example: 'abc123def456',
+            user: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'string',
+                  description: 'User ID',
+                },
+                username: {
+                  type: 'string',
+                  description: 'Username',
+                },
+                email: {
+                  type: 'string',
+                  format: 'email',
+                  description: 'Email address',
+                },
+                fullName: {
+                  type: 'string',
+                  description: 'Full name of the user',
+                },
+                role: {
+                  type: 'string',
+                  description: 'User role',
+                  enum: ['SuperAdmin', 'Manager', 'HR', 'Developer', 'Marketing', 'CustomStaff'],
+                },
+                department: {
+                  type: 'string',
+                  description: 'Department name',
+                },
+                teamId: {
+                  type: 'string',
+                  description: 'Team ID',
+                },
+              },
             },
           },
         },
@@ -154,61 +87,447 @@ const options: swaggerJsdoc.Options = {
             message: {
               type: 'string',
               description: 'Error message',
-              example: 'Invalid credentials',
             },
             error: {
               type: 'string',
-              description: 'Additional error details (optional)',
-              example: 'Authentication failed',
+              description: 'Detailed error information (only in development)',
+            },
+            errors: {
+              type: 'object',
+              description: 'Validation errors',
+              additionalProperties: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                },
+              },
             },
           },
         },
-        BulkPayslipResult: {
+        // Daily Task schemas
+        DailyTask: {
           type: 'object',
           properties: {
-            success: {
-              type: 'boolean',
-              description: 'Whether the bulk operation was successful',
-              example: true,
+            dailyTaskSubmissionId: {
+              type: 'string',
+              description: 'Unique ID of the daily task submission',
             },
-            totalEmployees: {
-              type: 'number',
-              description: 'Total number of active employees processed',
-              example: 25,
+            employeeId: {
+              type: 'string',
+              description: 'ID of the employee who submitted the report',
             },
-            successfulPayslips: {
-              type: 'number',
-              description: 'Number of payslips generated successfully',
-              example: 24,
+            workDescription: {
+              type: 'string',
+              description: 'Description of work done',
             },
-            failedPayslips: {
-              type: 'number',
-              description: 'Number of payslips that failed to generate',
-              example: 1,
+            status: {
+              type: 'string',
+              enum: ['Pending', 'Completed'],
+              description: 'Status of the task',
             },
-            generationTimeMs: {
-              type: 'number',
-              description: 'Total time taken for the operation in milliseconds',
-              example: 5430,
+            newIdeas: {
+              type: 'string',
+              nullable: true,
+              description: 'New ideas or improvements',
             },
-            errors: {
+            submissionDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Date of submission',
+            },
+            submissionDateEpoch: {
+              type: 'string',
+              description: 'Submission date in epoch milliseconds',
+            },
+            submittedAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Timestamp of submission',
+            },
+            submittedAtEpoch: {
+              type: 'string',
+              description: 'Submission timestamp in epoch milliseconds',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp',
+            },
+            updatedAtEpoch: {
+              type: 'string',
+              description: 'Last update timestamp in epoch milliseconds',
+            },
+            jiraLinks: {
               type: 'array',
-              description: 'List of errors encountered during generation',
               items: {
                 type: 'object',
                 properties: {
-                  employeeId: {
+                  dailyTaskJiraLinkId: {
                     type: 'string',
-                    description: 'Employee ID that encountered the error',
-                    example: '5',
                   },
-                  error: {
+                  label: {
                     type: 'string',
-                    description: 'Error message',
-                    example: 'Insufficient salary data for payslip calculation',
+                    nullable: true,
+                  },
+                  url: {
+                    type: 'string',
+                    format: 'uri',
+                  },
+                  createdAt: {
+                    type: 'string',
+                    format: 'date-time',
+                  },
+                  createdAtEpoch: {
+                    type: 'string',
                   },
                 },
               },
+            },
+            attachments: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  dailyTaskAttachmentId: {
+                    type: 'string',
+                  },
+                  fileName: {
+                    type: 'string',
+                  },
+                  fileUrl: {
+                    type: 'string',
+                    format: 'uri',
+                  },
+                  fileType: {
+                    type: 'string',
+                  },
+                  mimeType: {
+                    type: 'string',
+                  },
+                  fileSize: {
+                    type: 'number',
+                  },
+                  uploadedAt: {
+                    type: 'string',
+                    format: 'date-time',
+                  },
+                  uploadedAtEpoch: {
+                    type: 'string',
+                  },
+                },
+              },
+            },
+            employee: {
+              type: 'object',
+              properties: {
+                employeeId: {
+                  type: 'string',
+                },
+                fullName: {
+                  type: 'string',
+                },
+                emailAddress: {
+                  type: 'string',
+                  format: 'email',
+                },
+                username: {
+                  type: 'string',
+                },
+                assignedRole: {
+                  type: 'string',
+                },
+                assignedDepartment: {
+                  type: 'string',
+                },
+                teamId: {
+                  type: 'string',
+                },
+              },
+            },
+          },
+        },
+        DailyTaskListResponse: {
+          type: 'object',
+          properties: {
+            date: {
+              type: 'string',
+              format: 'date',
+              description: 'Date for which tasks are fetched',
+            },
+            count: {
+              type: 'integer',
+              description: 'Number of tasks returned',
+            },
+            dailyTasks: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/DailyTask',
+              },
+            },
+          },
+        },
+        DailyTaskCreateResponse: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+              description: 'Success message',
+            },
+            dailyTask: {
+              $ref: '#/components/schemas/DailyTask',
+            },
+          },
+        },
+        Pagination: {
+          type: 'object',
+          properties: {
+            page: {
+              type: 'integer',
+              description: 'Current page number',
+            },
+            limit: {
+              type: 'integer',
+              description: 'Records per page',
+            },
+            totalCount: {
+              type: 'integer',
+              description: 'Total number of records',
+            },
+            totalPages: {
+              type: 'integer',
+              description: 'Total number of pages',
+            },
+            hasNextPage: {
+              type: 'boolean',
+              description: 'Whether there is a next page',
+            },
+            hasPreviousPage: {
+              type: 'boolean',
+              description: 'Whether there is a previous page',
+            },
+          },
+        },
+        // Payslip schemas
+        Payslip: {
+          type: 'object',
+          properties: {
+            payslipId: {
+              type: 'string',
+            },
+            employeeId: {
+              type: 'string',
+            },
+            month: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 12,
+            },
+            year: {
+              type: 'integer',
+            },
+            status: {
+              type: 'string',
+              enum: ['Draft', 'Approved', 'Paid', 'Cancelled'],
+            },
+            workingDays: {
+              type: 'integer',
+            },
+            payableDays: {
+              type: 'integer',
+            },
+            unpaidLeaveDays: {
+              type: 'integer',
+            },
+            totalEarnings: {
+              type: 'number',
+            },
+            totalDeductions: {
+              type: 'number',
+            },
+            netPay: {
+              type: 'number',
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+          },
+        },
+        PayslipListResponse: {
+          type: 'object',
+          properties: {
+            payslips: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/Payslip',
+              },
+            },
+            pagination: {
+              $ref: '#/components/schemas/Pagination',
+            },
+          },
+        },
+        PayslipGenerateResponse: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+            },
+            payslip: {
+              $ref: '#/components/schemas/Payslip',
+            },
+          },
+        },
+        GeneratePayslipPayload: {
+          type: 'object',
+          required: ['employeeId', 'month', 'year'],
+          properties: {
+            employeeId: {
+              type: 'string',
+              description: 'Employee ID',
+            },
+            month: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 12,
+              description: 'Month (1-12)',
+            },
+            year: {
+              type: 'integer',
+              description: 'Year',
+            },
+          },
+        },
+        // Employee schema
+        Employee: {
+          type: 'object',
+          properties: {
+            employeeId: {
+              type: 'string',
+            },
+            fullName: {
+              type: 'string',
+            },
+            emailAddress: {
+              type: 'string',
+              format: 'email',
+            },
+            username: {
+              type: 'string',
+            },
+            assignedRole: {
+              type: 'string',
+              enum: ['SuperAdmin', 'Manager', 'HR', 'Developer', 'Marketing', 'CustomStaff'],
+            },
+            assignedDepartment: {
+              type: 'string',
+            },
+            teamId: {
+              type: 'string',
+              nullable: true,
+            },
+            isActive: {
+              type: 'boolean',
+            },
+          },
+        },
+        // Attendance schemas
+        Attendance: {
+          type: 'object',
+          properties: {
+            attendanceId: {
+              type: 'string',
+            },
+            employeeId: {
+              type: 'string',
+            },
+            date: {
+              type: 'string',
+              format: 'date',
+            },
+            checkIn: {
+              type: 'string',
+              format: 'date-time',
+            },
+            checkOut: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+            },
+            totalHours: {
+              type: 'number',
+            },
+            status: {
+              type: 'string',
+              enum: ['Present', 'Absent', 'Half-Day', 'Holiday'],
+            },
+          },
+        },
+        // Team schemas
+        Team: {
+          type: 'object',
+          properties: {
+            teamId: {
+              type: 'string',
+            },
+            teamName: {
+              type: 'string',
+            },
+            teamLead: {
+              type: 'string',
+            },
+            department: {
+              type: 'string',
+            },
+            memberCount: {
+              type: 'integer',
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+            },
+          },
+        },
+        // Leave schemas
+        LeaveRequest: {
+          type: 'object',
+          properties: {
+            leaveRequestId: {
+              type: 'string',
+            },
+            employeeId: {
+              type: 'string',
+            },
+            leaveType: {
+              type: 'string',
+              enum: ['Sick', 'Casual', 'Privilege', 'Other'],
+            },
+            fromDate: {
+              type: 'string',
+              format: 'date',
+            },
+            toDate: {
+              type: 'string',
+              format: 'date',
+            },
+            reason: {
+              type: 'string',
+            },
+            status: {
+              type: 'string',
+              enum: ['Pending', 'Approved', 'Rejected'],
+            },
+            attachmentUrl: {
+              type: 'string',
+              nullable: true,
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
             },
           },
         },
@@ -216,49 +535,51 @@ const options: swaggerJsdoc.Options = {
     },
     security: [
       {
-        cookieAuth: [],
-      },
-      {
         bearerAuth: [],
       },
     ],
     tags: [
       {
         name: 'Authentication',
-        description: 'Cookie-based authentication with JWT tokens and CSRF protection',
+        description: 'Authentication endpoints',
       },
       {
         name: 'Employees',
-        description: 'Employee management endpoints (requires authentication)',
+        description: 'Employee management endpoints',
       },
       {
         name: 'Teams',
-        description: 'Team management endpoints (requires authentication)',
+        description: 'Team management endpoints',
       },
       {
         name: 'Attendance',
-        description: 'Attendance tracking endpoints (requires authentication)',
+        description: 'Attendance tracking endpoints',
       },
       {
         name: 'Daily Tasks',
-        description: 'Date-based employee work reports, Jira links, and attachments (requires authentication)',
+        description: 'Date-based employee work reports, Jira links, and attachments',
       },
       {
         name: 'Payslips',
-        description: 'Payslip review, employee self-service, adjustments, and PDF downloads (requires authentication)',
-      },
-      {
-        name: 'Leave Management',
-        description: 'Leave requests, balances, and approvals (requires authentication and role-based authorization)',
+        description: 'Payslip review, employee self-service, adjustments, and PDF downloads',
       },
       {
         name: 'Payslip Automation',
-        description: 'Automatic payslip generation, scheduling, and bulk operations (requires SuperAdmin/Manager access)',
+        description: 'Automated payslip generation and management',
+      },
+      {
+        name: 'Leave',
+        description: 'Leave management endpoints',
       },
     ],
   },
   // Use relative paths from project root
-  apis: ['./src/routes/*.ts', './src/routes/*.js'],
+  apis: [
+    './src/routes/*.ts',
+    './src/routes/*.js',
+    './src/swagger/docs/*.ts',
+    './src/swagger/docs/*.js',
+  ],
 };
 
 const swaggerSpec = swaggerJsdoc(options) as any;

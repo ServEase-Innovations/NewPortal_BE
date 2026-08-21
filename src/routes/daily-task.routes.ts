@@ -3,6 +3,7 @@ import {
   createDailyTask,
   deleteDailyTaskAttachment,
   getDailyTaskById,
+  getDailyTaskHistory,
   getDailyTasks,
   getMyDailyTasks,
   updateDailyTask,
@@ -164,6 +165,23 @@ router.get(
  *         description: Employee daily tasks fetched successfully
  */
 router.get("/mine", authenticate, getMyDailyTasks);
+
+// Swagger docs for GET /daily-tasks/history live in
+// src/swagger/docs/daily-task.docs.ts (kept out of this route file per
+// project convention — see src/swagger/swagger.ts for how it's picked up).
+router.get(
+  "/history",
+  authenticate,
+  authorize(
+    "SuperAdmin",
+    "Manager",
+    "Developer",
+    "Marketing",
+    "CustomStaff",
+    "HR"
+  ),
+  getDailyTaskHistory
+);
 
 /**
  * @swagger
