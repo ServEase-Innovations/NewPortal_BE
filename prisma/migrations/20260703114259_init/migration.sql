@@ -18,17 +18,29 @@ DROP TYPE "public"."AppraisalState_old";
 ALTER TABLE "employees" ALTER COLUMN "appraisal_state" SET DEFAULT 'Pristine';
 COMMIT;
 
--- AlterEnum
-ALTER TYPE "EmployeeRole" ADD VALUE 'HR';
+-- Align employee identifiers with the current bigint-based schema before
+-- later migrations add bigint foreign keys to employees.
+ALTER TABLE "attendance" DROP CONSTRAINT "attendance_employee_id_fkey";
+ALTER TABLE "employees" DROP CONSTRAINT "employees_manager_id_fkey";
+ALTER TABLE "employees" DROP CONSTRAINT "employees_pkey";
+
+ALTER TABLE "employees"
+ALTER COLUMN "employee_id" SET DATA TYPE BIGINT USING "employee_id"::bigint,
+ALTER COLUMN "manager_id" SET DATA TYPE BIGINT USING "manager_id"::bigint;
+
+ALTER TABLE "attendance"
+ALTER COLUMN "employee_id" SET DATA TYPE BIGINT USING "employee_id"::bigint;
+
+ALTER TABLE "employees" ADD CONSTRAINT "employees_pkey" PRIMARY KEY ("employee_id");
+ALTER TABLE "employees" ADD CONSTRAINT "employees_manager_id_fkey"
+  FOREIGN KEY ("manager_id") REFERENCES "employees"("employee_id")
+  ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "attendance" ADD CONSTRAINT "attendance_employee_id_fkey"
+  FOREIGN KEY ("employee_id") REFERENCES "employees"("employee_id")
+  ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AlterTable
 ALTER TABLE "attendance" DROP CONSTRAINT "attendance_pkey",
-ALTER COLUMN "attendance_id" SET DATA TYPE SERIAL,
+ALTER COLUMN "attendance_id" SET DATA TYPE INTEGER USING "attendance_id"::integer,
 ADD CONSTRAINT "attendance_pkey" PRIMARY KEY ("attendance_id");
 
--- AlterTable
-ALTER TABLE "employees" ADD COLUMN     "last_login" TIMESTAMP(3),
-ADD COLUMN     "refresh_token" TEXT;
-
--- DropTable
-DROP TABLE "User";

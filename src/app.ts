@@ -1,5 +1,6 @@
 // src/app.ts
 import express from 'express';
+import { createServer } from 'http';
 import swaggerUi from 'swagger-ui-express';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -15,7 +16,9 @@ import dailyTaskRoutes from "./routes/daily-task.routes";
 import payslipRoutes from "./routes/payslip.routes";
 import payslipAutomationRoutes from "./routes/payslip-automation.routes";
 import leaveRoutes from "./routes/leave.routes";
+import messageRoutes from "./routes/message.routes";
 import { startPayslipScheduler } from "./services/payslip-scheduler.service";
+import { initSocket } from "./sockets/socket";
 
 dotenv.config();
 
@@ -116,6 +119,7 @@ app.use("/daily-tasks", dailyTaskRoutes);
 app.use("/payslips", payslipRoutes);
 app.use("/payslips/automation", payslipAutomationRoutes);
 app.use("/leave", leaveRoutes);
+app.use("/messages", messageRoutes);
 app.use("/auth", authRoutes);
 
 // Error handling middleware
@@ -136,9 +140,16 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
+// ✅ Wrap the Express app in a plain http.Server so Socket.io (the
+// real-time layer behind /messages "chat like WhatsApp") can share the
+// same port instead of needing a separate server/process.
+const httpServer = createServer(app);
+initSocket(httpServer, allowedOrigins);
+
 // Start server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`💬 Socket.io chat layer attached on the same port`);
   console.log(`📚 Swagger UI available at: http://localhost:${PORT}/api-docs`);
   console.log(`📄 Swagger JSON available at: http://localhost:${PORT}/api-docs.json`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
