@@ -7,8 +7,8 @@
 
 */
 -- AlterTable
-ALTER TABLE "employees" ADD COLUMN     "password" TEXT NOT NULL,
-ADD COLUMN     "username" TEXT NOT NULL;
+-- ALTER TABLE "employees" ADD COLUMN     "password" TEXT NOT NULL,
+-- ADD COLUMN     "username" TEXT NOT NULL;
 
--- CreateIndex
-CREATE UNIQUE INDEX "employees_username_key" ON "employees"("username");
+-- -- CreateIndex
+-- CREATE UNIQUE INDEX "employees_username_key" ON "employees"("username");
