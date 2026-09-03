@@ -46,7 +46,72 @@ model Employee {
   subordinates Employee[] @relation("ManagerSubordinates")
   team         Team?      @relation(fields: [teamId], references: [teamId])
 
+  conversationsCreated     Conversation[]             @relation("ConversationCreatedBy")
+  conversationParticipant  ConversationParticipant[]
+  sentMessages             Message[]                  @relation("MessageSender")
+
   @@map("employees")
+}
+
+// ============================================================================
+// MESSAGING / CHAT
+// ============================================================================
+
+model Conversation {
+  conversationId String  @id @default(cuid()) @map("conversation_id")
+  isGroup        Boolean @default(false) @map("is_group")
+  groupName      String? @map("group_name")
+  createdById    BigInt  @map("created_by_id")
+  createdAt      BigInt  @map("created_at")
+  updatedAt      BigInt  @map("updated_at")
+  lastMessageAt  BigInt? @map("last_message_at")
+
+  createdBy    Employee                   @relation("ConversationCreatedBy", fields: [createdById], references: [employeeId], onDelete: Cascade)
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([lastMessageAt], map: "idx_conversation_last_message")
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  conversationParticipantId BigInt  @id @default(autoincrement()) @map("conversation_participant_id")
+  conversationId            String  @map("conversation_id")
+  employeeId                 BigInt @map("employee_id")
+  joinedAt                   BigInt @map("joined_at")
+  lastReadAt                 BigInt? @map("last_read_at")
+  isMuted                     Boolean @default(false) @map("is_muted")
+
+  conversation Conversation @relation(fields: [conversationId], references: [conversationId], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
+
+  @@unique([conversationId, employeeId])
+  @@index([employeeId], map: "idx_participant_employee")
+  @@map("conversation_participants")
+}
+
+model Message {
+  messageId      BigInt      @id @default(autoincrement()) @map("message_id")
+  conversationId String      @map("conversation_id")
+  senderId       BigInt      @map("sender_id")
+  content        String      @db.Text
+  messageType    MessageType @default(Text) @map("message_type")
+  fileUrl        String?     @map("file_url")
+  fileName       String?     @map("file_name")
+  isDeleted      Boolean     @default(false) @map("is_deleted")
+  createdAt      BigInt      @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [conversationId], onDelete: Cascade)
+  sender       Employee     @relation("MessageSender", fields: [senderId], references: [employeeId], onDelete: Cascade)
+
+  @@index([conversationId, createdAt], map: "idx_message_conversation_created")
+  @@map("messages")
+}
+
+enum MessageType {
+  Text
+  Image
+  File
 }
 
 model Team {
