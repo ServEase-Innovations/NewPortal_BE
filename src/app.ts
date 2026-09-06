@@ -9,6 +9,7 @@ import path from 'path';
 
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from "./routes/employee.routes";
+import departmentRoutes from "./routes/department.routes";
 import swaggerSpec from "./swagger/swagger";
 import teamRoutes from "./routes/team.routes";
 import attendanceRoutes from "./routes/attendance.routes";
@@ -113,6 +114,7 @@ app.get('/api-docs.json', (req, res) => {
 
 // Routes
 app.use("/employees", employeeRoutes);
+app.use("/departments", departmentRoutes);
 app.use("/teams", teamRoutes);
 app.use("/attendance", attendanceRoutes);
 app.use("/daily-tasks", dailyTaskRoutes);

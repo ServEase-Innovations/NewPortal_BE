@@ -6,6 +6,20 @@ datasource db {
   provider = "postgresql"
 }
 
+model Department {
+  departmentId   BigInt   @id @default(autoincrement()) @map("department_id")
+  name           String   @unique
+  code           String   @unique
+  description    String?
+  headEmployeeId BigInt?  @map("head_employee_id")
+  budget         Decimal? @db.Decimal(15, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      BigInt   @map("created_at")
+  updatedAt      BigInt   @map("updated_at")
+
+  @@map("departments")
+}
+
 model Employee {
   employeeId         BigInt         @id @default(autoincrement()) @map("employee_id")
   fullName           String         @map("full_name")
