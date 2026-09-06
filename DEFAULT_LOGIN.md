@@ -4,7 +4,7 @@
 
 After running the setup, a default admin account is created automatically.
 
-### Login Details
+### Admin Login
 
 ```
 Username: admin
@@ -12,22 +12,68 @@ Password: admin123
 Role: SuperAdmin
 ```
 
+## Test User Accounts
+
+For testing different role permissions, use these accounts:
+
+### 👨‍💼 Manager Account
+```
+Username: manager
+Password: manager123
+Role: Manager
+Department: Engineering
+```
+
+### 👤 HR Account
+```
+Username: hr
+Password: hr123
+Role: HR
+Department: Human Resources
+```
+
+### 👨‍💻 Employee/Developer Account
+```
+Username: employee
+Password: employee123
+Role: Developer
+Department: Engineering
+```
+
+## Quick Reference Table
+
+| Role        | Username  | Password     | Department        |
+|-------------|-----------|--------------|-------------------|
+| SuperAdmin  | admin     | admin123     | Administration    |
+| Manager     | manager   | manager123   | Engineering       |
+| HR          | hr        | hr123        | Human Resources   |
+| Developer   | employee  | employee123  | Engineering       |
+
 ## Important Security Notes
 
-⚠️ **CHANGE THE DEFAULT PASSWORD IMMEDIATELY** after first login!
+⚠️ **CHANGE ALL DEFAULT PASSWORDS IMMEDIATELY** after first login!
 
-## How to Create the Default Admin User
+These are test/development credentials only. Never use these in production!
 
-If the admin user doesn't exist, run:
+## How to Create Users
+
+### Create Default Admin User
 
 ```bash
 npm run create-admin
 ```
 
-This script will:
-- Check if the admin user exists
-- Create it if it doesn't exist
+### Create All Test Users (Employee, HR, Manager)
+
+```bash
+npm run create-test-users
+```
+
+Both scripts will:
+- Check if users already exist
+- Create them if they don't exist
 - Display the credentials
+- Can be run multiple times safely
 
 ## Creating Additional Users
 

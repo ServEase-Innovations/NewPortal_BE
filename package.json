@@ -16,7 +16,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:push": "prisma db push",
-    "create-admin": "tsx scripts/create-default-user.ts"
+    "create-admin": "tsx scripts/create-default-user.ts",
+    "create-test-users": "tsx scripts/create-test-users.ts"
   },
   "keywords": [],
   "author": "",
