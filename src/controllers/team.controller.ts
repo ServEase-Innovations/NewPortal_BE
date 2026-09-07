@@ -21,10 +21,16 @@ const serializeTeam = (team: any) => {
     updatedAt: team.updatedAt ? new Date(Number(team.updatedAt)).toISOString() : null,
     // Serialize nested employees if present
     employees: team.employees ? team.employees.map((emp: any) => ({
-      ...emp,
+      employeeId: emp.employeeId?.toString(),
+      fullName: emp.fullName,
+      emailAddress: emp.emailAddress,
+      assignedRole: emp.assignedRole,
+      assignedDepartment: emp.assignedDepartment,
+      isActive: emp.isActive,
+      username: emp.username,
       joinedAt: emp.joinedAt ? new Date(Number(emp.joinedAt)).toISOString() : null,
-      last_login: emp.last_login ? new Date(Number(emp.last_login)).toISOString() : null,
-    })) : undefined,
+      lastLogin: emp.lastLogin ? new Date(Number(emp.lastLogin)).toISOString() : null,
+    })) : [],
   };
 };
 
