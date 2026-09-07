@@ -335,6 +335,20 @@ enum EmployeeRole {
   HR
 }
 
+model Role {
+  roleId          Int      @id @default(autoincrement()) @map("role_id")
+  roleName        String   @unique @map("role_name")
+  displayName     String   @map("display_name")
+  description     String?
+  privileges      Json     @default("{}") // Store permissions as JSON
+  isActive        Boolean  @default(true) @map("is_active")
+  isSystemRole    Boolean  @default(false) @map("is_system_role") // System roles can't be deleted
+  createdAt       BigInt   @map("created_at")
+  updatedAt       BigInt   @map("updated_at")
+
+  @@map("roles")
+}
+
 enum AttendanceStatus {
   Working
   OnLeave

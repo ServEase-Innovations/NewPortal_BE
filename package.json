@@ -19,7 +19,8 @@
     "create-admin": "tsx scripts/create-default-user.ts",
     "create-test-users": "tsx scripts/create-test-users.ts",
     "seed-departments": "tsx scripts/seed-departments.ts",
-    "seed-teams": "tsx scripts/seed-teams.ts"
+    "seed-teams": "tsx scripts/seed-teams.ts",
+    "seed-roles": "tsx scripts/seed-roles.ts"
   },
   "keywords": [],
   "author": "",
