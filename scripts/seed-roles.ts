@@ -25,11 +25,10 @@ const defaultRoles = [
       canEditTeams: true,
       canDeleteTeams: true,
       
-      // Role Management
+      // Role Management (no delete - use active/inactive instead)
       canViewRoles: true,
       canCreateRoles: true,
       canEditRoles: true,
-      canDeleteRoles: true,
       
       // Attendance & Leave
       canViewAllAttendance: true,
@@ -74,11 +73,10 @@ const defaultRoles = [
       canEditTeams: true,
       canDeleteTeams: true,
       
-      // Role Management
+      // Role Management (no delete - use active/inactive instead)
       canViewRoles: true,
       canCreateRoles: true,
       canEditRoles: true,
-      canDeleteRoles: true,
       
       // Attendance & Leave
       canViewAllAttendance: true,
@@ -117,17 +115,16 @@ const defaultRoles = [
       canEditDepartments: false,
       canDeleteDepartments: false,
       
-      // Team Management
+      // Team Management (HR can create teams)
       canViewTeams: true,
-      canCreateTeams: false,
+      canCreateTeams: true,
       canEditTeams: false,
       canDeleteTeams: false,
       
-      // Role Management
+      // Role Management (no delete - use active/inactive instead)
       canViewRoles: true,
       canCreateRoles: false,
       canEditRoles: false,
-      canDeleteRoles: false,
       
       // Attendance & Leave
       canViewAllAttendance: true,
@@ -166,17 +163,16 @@ const defaultRoles = [
       canEditDepartments: false,
       canDeleteDepartments: false,
       
-      // Team Management
+      // Team Management (Managers can create and edit teams)
       canViewTeams: true,
-      canCreateTeams: false,
+      canCreateTeams: true,
       canEditTeams: true,
       canDeleteTeams: false,
       
-      // Role Management
+      // Role Management (no delete - use active/inactive instead)
       canViewRoles: false,
       canCreateRoles: false,
       canEditRoles: false,
-      canDeleteRoles: false,
       
       // Attendance & Leave
       canViewAllAttendance: true,
@@ -221,11 +217,10 @@ const defaultRoles = [
       canEditTeams: false,
       canDeleteTeams: false,
       
-      // Role Management
+      // Role Management (no delete - use active/inactive instead)
       canViewRoles: false,
       canCreateRoles: false,
       canEditRoles: false,
-      canDeleteRoles: false,
       
       // Attendance & Leave
       canViewAllAttendance: false,

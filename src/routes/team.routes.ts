@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { authenticate, authorize } from "../middleware/auth.middleware";
 
 import {
   createTeam,
@@ -43,7 +44,7 @@ const router = Router();
  *       201:
  *         description: Team created successfully
  */
-router.post("/", createTeam);
+router.post("/", authenticate, authorize("CEO", "SuperAdmin", "HR", "Manager"), createTeam);
 
 /**
  * @swagger
@@ -57,7 +58,7 @@ router.post("/", createTeam);
  *       200:
  *         description: Teams fetched successfully.
  */
-router.get("/", getTeams);
+router.get("/", authenticate, getTeams);
 
 /**
  * @swagger
@@ -80,7 +81,7 @@ router.get("/", getTeams);
  *       404:
  *         description: Team not found
  */
-router.get("/:id", getTeamById);
+router.get("/:id", authenticate, getTeamById);
 
 /**
  * @swagger
@@ -124,7 +125,7 @@ router.get("/:id", getTeamById);
  *       404:
  *         description: Team not found
  */
-router.put("/:id", updateTeam);
+router.put("/:id", authenticate, authorize("CEO", "SuperAdmin", "HR", "Manager"), updateTeam);
 
 /**
  * @swagger
@@ -147,6 +148,6 @@ router.put("/:id", updateTeam);
  *       404:
  *         description: Team not found
  */
-router.delete("/:id", deleteTeam);
+router.delete("/:id", authenticate, authorize("CEO", "SuperAdmin"), deleteTeam);
 
 export default router;
