@@ -2,9 +2,58 @@ import prisma from "../src/prisma";
 
 const defaultRoles = [
   {
+    roleName: "CEO",
+    displayName: "Chief Executive Officer",
+    description: "Top of organizational hierarchy with full system access",
+    isSystemRole: true,
+    privileges: {
+      // Employee Management
+      canViewEmployees: true,
+      canCreateEmployees: true,
+      canEditEmployees: true,
+      canDeleteEmployees: true,
+      
+      // Department Management
+      canViewDepartments: true,
+      canCreateDepartments: true,
+      canEditDepartments: true,
+      canDeleteDepartments: true,
+      
+      // Team Management
+      canViewTeams: true,
+      canCreateTeams: true,
+      canEditTeams: true,
+      canDeleteTeams: true,
+      
+      // Role Management
+      canViewRoles: true,
+      canCreateRoles: true,
+      canEditRoles: true,
+      canDeleteRoles: true,
+      
+      // Attendance & Leave
+      canViewAllAttendance: true,
+      canEditAttendance: true,
+      canApproveLeave: true,
+      canViewLeaveRequests: true,
+      
+      // Payroll
+      canViewPayroll: true,
+      canGeneratePayslips: true,
+      canApprovePayslips: true,
+      
+      // Reports & Analytics
+      canViewReports: true,
+      canExportData: true,
+      
+      // System Settings
+      canManageSettings: true,
+    },
+  },
+  {
     roleName: "SuperAdmin",
     displayName: "Super Administrator",
-    description: "Full system access with all privileges",
+    description: "System administrator with full technical access",
     isSystemRole: true,
     privileges: {
       // Employee Management
@@ -239,10 +288,11 @@ async function seedRoles() {
 
   console.log('✨ Role seeding complete!');
   console.log('\n📋 Created/Updated roles:');
-  console.log('  1. SuperAdmin - Full system access');
-  console.log('  2. HR - Employee & leave management');
-  console.log('  3. Manager - Team management & approvals');
-  console.log('  4. Employee - Basic self-service access');
+  console.log('  1. CEO - Top of organizational hierarchy');
+  console.log('  2. SuperAdmin - System administrator');
+  console.log('  3. HR - Employee & leave management');
+  console.log('  4. Manager - Team management & approvals');
+  console.log('  5. Employee - Basic self-service access');
 }
 
 seedRoles()

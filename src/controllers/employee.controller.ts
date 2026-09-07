@@ -343,14 +343,14 @@ export const deleteEmployee = async (
 };
 
 
-// GET /employees/managers - Get employees who can be managers (SuperAdmin, Manager, HR roles)
+// GET /employees/managers - Get employees who can be managers (CEO, SuperAdmin, Manager, HR roles)
 export const getManagers = async (req: Request, res: Response) => {
   try {
     const managers = await prisma.employee.findMany({
       where: {
         isActive: true,
         assignedRole: {
-          in: ['SuperAdmin', 'Manager', 'HR'], // Only these roles can be managers
+          in: ['CEO', 'SuperAdmin', 'Manager', 'HR'], // CEO, SuperAdmin, Manager, and HR can be managers
         },
       },
       select: {

@@ -328,6 +328,7 @@ model PayslipAuditLog {
 
 enum EmployeeRole {
   SuperAdmin
+  CEO
   Manager
   Developer
   Marketing

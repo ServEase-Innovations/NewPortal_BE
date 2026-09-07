@@ -102,7 +102,7 @@ router.get('/:id', authenticate, getDepartmentById);
  *       500:
  *         description: Server error
  */
-router.post('/', authenticate, authorize('SuperAdmin', 'HR'), createDepartment);
+router.post('/', authenticate, authorize('CEO', 'SuperAdmin', 'HR'), createDepartment);
 
 /**
  * @swagger
@@ -149,7 +149,7 @@ router.post('/', authenticate, authorize('SuperAdmin', 'HR'), createDepartment);
  *       500:
  *         description: Server error
  */
-router.put('/:id', authenticate, authorize('SuperAdmin', 'HR'), updateDepartment);
+router.put('/:id', authenticate, authorize('CEO', 'SuperAdmin', 'HR'), updateDepartment);
 
 /**
  * @swagger
@@ -177,6 +177,6 @@ router.put('/:id', authenticate, authorize('SuperAdmin', 'HR'), updateDepartment
  *       500:
  *         description: Server error
  */
-router.delete('/:id', authenticate, authorize('SuperAdmin'), deleteDepartment);
+router.delete('/:id', authenticate, authorize('CEO', 'SuperAdmin'), deleteDepartment);
 
 export default router;

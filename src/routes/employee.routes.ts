@@ -206,7 +206,7 @@ router.get('/managers', authenticate, getManagers);
 router.post(
   "/",
   authenticate,
-  authorize("SuperAdmin", "HR"),
+  authorize("CEO", "SuperAdmin", "HR"),
   createEmployee
 );
 
@@ -297,7 +297,7 @@ router.post(
 router.get(
   "/",
   authenticate,
-  authorize("SuperAdmin", "HR", "Manager"),
+  authorize("CEO", "SuperAdmin", "HR", "Manager"),
   getEmployees
 );
 
@@ -417,7 +417,7 @@ router.get(
 router.get(
   "/:id",
   authenticate,
-  authorize("SuperAdmin", "HR", "Manager"),
+  authorize("CEO", "SuperAdmin", "HR", "Manager"),
   getEmployeeById
 );
 
@@ -519,7 +519,7 @@ router.get(
 router.put(
   "/:id",
   authenticate,
-  authorize("SuperAdmin", "HR"),
+  authorize("CEO", "SuperAdmin", "HR"),
   updateEmployee
 );
 
@@ -564,7 +564,7 @@ router.put(
 router.delete(
   "/:id",
   authenticate,
-  authorize("SuperAdmin"),
+  authorize("CEO", "SuperAdmin"),
   deleteEmployee
 );
 
