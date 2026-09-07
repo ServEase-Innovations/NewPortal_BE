@@ -2,12 +2,18 @@ import prisma from "../prisma";
 
 export const createTeamService = async (data: any) => {
   // Set timestamps as epoch
-  const teamData = {
-    ...data,
-    milestoneDeadline: data.milestoneDeadline ? BigInt(new Date(data.milestoneDeadline).getTime()) : BigInt(Date.now()),
+  const teamData: any = {
+    teamName: data.teamName,
+    projectTitle: data.projectTitle,
+    projectSummary: data.projectSummary || null,
     createdAt: BigInt(Date.now()),
     updatedAt: BigInt(Date.now()),
   };
+
+  // Only add milestoneDeadline if provided
+  if (data.milestoneDeadline) {
+    teamData.milestoneDeadline = BigInt(new Date(data.milestoneDeadline).getTime());
+  }
   
   return prisma.team.create({
     data: teamData,

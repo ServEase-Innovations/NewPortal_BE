@@ -13,5 +13,5 @@ export const createTeamSchema = z.object({
     .string()
     .optional(),
 
-  milestoneDeadline: z.coerce.date(),
+  milestoneDeadline: z.coerce.date().optional(),
 });

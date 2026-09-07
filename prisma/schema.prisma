@@ -133,7 +133,7 @@ model Team {
   teamName          String  @unique @map("team_name")
   projectTitle      String  @map("project_title")
   projectSummary    String? @map("project_summary")
-  milestoneDeadline BigInt  @map("milestone_deadline")
+  milestoneDeadline BigInt? @map("milestone_deadline")
   createdAt         BigInt  @map("created_at")
   updatedAt         BigInt  @map("updated_at")
 
