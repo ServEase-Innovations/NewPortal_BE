@@ -51,7 +51,7 @@ export const createTeam = async (
     res.status(201).json(serializeTeam(team));
 
   } catch (error) {
-    console.error(error);
+    console.error('[createTeam] Error:', error);
 
     res.status(500).json({
       message: "Something went wrong",
@@ -69,6 +69,7 @@ export const getTeams = async (
     res.json(serializeTeams(teams));
 
   } catch (error) {
+    console.error('[getTeams] Error:', error);
     res.status(500).json({
       message: "Failed to fetch teams",
     });
