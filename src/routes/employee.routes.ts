@@ -9,6 +9,7 @@ import {
   deleteEmployee,
   registerEmployee,
   getProfile,
+  getManagers,
 } from "../controllers/employee.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 
@@ -99,6 +100,26 @@ router.post('/register', registerEmployee);
  *         description: Server error
  */
 router.get('/profile', authenticate, getProfile);
+
+/**
+ * @swagger
+ * /employees/managers:
+ *   get:
+ *     summary: Get list of employees who can be managers
+ *     description: Returns employees with SuperAdmin, Manager, or HR roles who can manage other employees
+ *     tags:
+ *       - Employees
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Managers list fetched successfully
+ *       401:
+ *         description: Authentication required
+ *       500:
+ *         description: Server error
+ */
+router.get('/managers', authenticate, getManagers);
 
 /**
  * @swagger

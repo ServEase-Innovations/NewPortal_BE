@@ -341,3 +341,36 @@ export const deleteEmployee = async (
     });
   }
 };
+
+
+// GET /employees/managers - Get employees who can be managers (SuperAdmin, Manager, HR roles)
+export const getManagers = async (req: Request, res: Response) => {
+  try {
+    const managers = await prisma.employee.findMany({
+      where: {
+        isActive: true,
+        assignedRole: {
+          in: ['SuperAdmin', 'Manager', 'HR'], // Only these roles can be managers
+        },
+      },
+      select: {
+        employeeId: true,
+        fullName: true,
+        emailAddress: true,
+        assignedRole: true,
+        assignedDepartment: true,
+      },
+      orderBy: {
+        fullName: 'asc',
+      },
+    });
+
+    res.json(serializeEmployees(managers));
+  } catch (error: any) {
+    console.error('Get managers error:', error);
+    res.status(500).json({
+      message: 'Failed to fetch managers',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};

@@ -186,6 +186,7 @@ export const registerService = async (data: {
   baseSalary?: number;
   allowances?: number;
   deductions?: number;
+  managerId?: string; // Accept manager ID
 }) => {
   // Generate username: first 3 chars of first name + first 3 chars of last name
   const generateUsername = (fullName: string): string => {
@@ -232,6 +233,7 @@ export const registerService = async (data: {
       allowances: data.allowances || 0,
       deductions: data.deductions || 0,
       joinedAt: BigInt(Date.now()),
+      managerId: data.managerId ? BigInt(data.managerId) : null,
     },
   });
 

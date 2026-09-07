@@ -18,6 +18,7 @@ export const registerEmployeeSchema = z.object({
   baseSalary: z.coerce.number().optional().default(0),
   allowances: z.coerce.number().optional().default(0),
   deductions: z.coerce.number().optional().default(0),
+  managerId: z.string().optional(), // Optional manager ID
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
