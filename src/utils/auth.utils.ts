@@ -56,19 +56,24 @@ export const verifyRefreshToken = (token: string): any => {
   }
 };
 
-export const generateUsername = (fullName: string): string => {
-  const nameParts = fullName.trim().split(' ');
-  if (nameParts.length === 1) {
-    return nameParts[0].slice(0, 6).toLowerCase();
+export const generateUsername = async (prisma: any): Promise<string> => {
+  // Get the highest employee ID
+  const lastEmployee = await prisma.employee.findFirst({
+    orderBy: {
+      employeeId: 'desc'
+    },
+    select: {
+      employeeId: true
+    }
+  });
+
+  let nextId = 1;
+  if (lastEmployee) {
+    nextId = Number(lastEmployee.employeeId) + 1;
   }
-  
-  const lastName = nameParts[nameParts.length - 1];
-  const firstName = nameParts[0];
-  
-  const lastNamePart = lastName.slice(0, 3).toLowerCase();
-  const firstNamePart = firstName.slice(0, 3).toLowerCase();
-  
-  const username = `${lastNamePart}${firstNamePart}`;
-  console.log('Generated username:', username, 'from fullName:', fullName);
+
+  // Format as 6-digit string with leading zeros
+  const username = nextId.toString().padStart(6, '0');
+  console.log('Generated username (Employee ID):', username);
   return username;
 };

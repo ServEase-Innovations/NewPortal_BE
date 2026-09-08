@@ -139,8 +139,8 @@ export const createEmployee = async (
       });
     }
 
-    // Generate username
-    const username = generateUsername(result.data.fullName);
+    // Generate username (6-digit employee ID)
+    const username = await generateUsername(prisma);
     
     // Hash the password if provided, otherwise use default
     let hashedPassword;
