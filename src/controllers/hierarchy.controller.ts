@@ -29,7 +29,7 @@ export const getMyHierarchy = async (req: AuthRequest, res: Response) => {
         assignedDepartment: true,
         isActive: true,
         joinedAt: true,
-        lastLogin: true,
+        last_login: true,
         managerId: true,
         teamId: true,
       }
@@ -62,7 +62,7 @@ export const getMyHierarchy = async (req: AuthRequest, res: Response) => {
           assignedDepartment: true,
           isActive: true,
           joinedAt: true,
-          lastLogin: true,
+          last_login: true,
           managerId: true,
         }
       });
@@ -91,7 +91,7 @@ export const getMyHierarchy = async (req: AuthRequest, res: Response) => {
         assignedDepartment: true,
         isActive: true,
         joinedAt: true,
-        lastLogin: true,
+        last_login: true,
         managerId: true,
       }
     });
@@ -111,7 +111,7 @@ export const getMyHierarchy = async (req: AuthRequest, res: Response) => {
           assignedDepartment: true,
           isActive: true,
           joinedAt: true,
-          lastLogin: true,
+          last_login: true,
           managerId: true,
         }
       });
@@ -130,12 +130,13 @@ export const getMyHierarchy = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// Helper to serialize BigInt fields
+// Helper to serialize BigInt fields and convert snake_case to camelCase
 function serializeEmployee(employee: any) {
   return {
     ...employee,
     employeeId: employee.employeeId.toString(),
     managerId: employee.managerId ? employee.managerId.toString() : null,
     teamId: employee.teamId ? employee.teamId.toString() : null,
+    lastLogin: employee.last_login, // Convert snake_case to camelCase for frontend
   };
 }
