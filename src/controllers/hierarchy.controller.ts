@@ -132,11 +132,19 @@ export const getMyHierarchy = async (req: AuthRequest, res: Response) => {
 
 // Helper to serialize BigInt fields and convert snake_case to camelCase
 function serializeEmployee(employee: any) {
+  const { last_login, ...rest } = employee; // Destructure to remove last_login
+  
   return {
-    ...employee,
-    employeeId: employee.employeeId.toString(),
-    managerId: employee.managerId ? employee.managerId.toString() : null,
-    teamId: employee.teamId ? employee.teamId.toString() : null,
-    lastLogin: employee.last_login, // Convert snake_case to camelCase for frontend
+    employeeId: rest.employeeId.toString(),
+    username: rest.username,
+    fullName: rest.fullName,
+    emailAddress: rest.emailAddress,
+    assignedRole: rest.assignedRole,
+    assignedDepartment: rest.assignedDepartment,
+    isActive: rest.isActive,
+    joinedAt: rest.joinedAt,
+    lastLogin: last_login, // Convert to camelCase
+    managerId: rest.managerId ? rest.managerId.toString() : null,
+    teamId: rest.teamId ? rest.teamId.toString() : null,
   };
 }
