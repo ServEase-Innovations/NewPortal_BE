@@ -132,17 +132,35 @@ export const getMyHierarchy = async (req: AuthRequest, res: Response) => {
 
 // Helper to serialize BigInt fields and convert snake_case to camelCase
 function serializeEmployee(employee: any) {
+  // Deep convert all BigInts to strings recursively
+  const convertBigInt = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'bigint') return obj.toString();
+    if (obj instanceof Date) return obj.toISOString();
+    if (Array.isArray(obj)) return obj.map(convertBigInt);
+    if (typeof obj === 'object') {
+      const converted: any = {};
+      for (const key in obj) {
+        converted[key] = convertBigInt(obj[key]);
+      }
+      return converted;
+    }
+    return obj;
+  };
+
+  const converted = convertBigInt(employee);
+
   return {
-    employeeId: employee.employeeId?.toString() || null,
-    username: employee.username || null,
-    fullName: employee.fullName || null,
-    emailAddress: employee.emailAddress || null,
-    assignedRole: employee.assignedRole || null,
-    assignedDepartment: employee.assignedDepartment || null,
-    isActive: employee.isActive || false,
-    joinedAt: employee.joinedAt instanceof Date ? employee.joinedAt.toISOString() : employee.joinedAt,
-    lastLogin: employee.last_login instanceof Date ? employee.last_login.toISOString() : employee.last_login,
-    managerId: employee.managerId ? employee.managerId.toString() : null,
-    teamId: employee.teamId ? employee.teamId.toString() : null,
+    employeeId: converted.employeeId || null,
+    username: converted.username || null,
+    fullName: converted.fullName || null,
+    emailAddress: converted.emailAddress || null,
+    assignedRole: converted.assignedRole || null,
+    assignedDepartment: converted.assignedDepartment || null,
+    isActive: converted.isActive || false,
+    joinedAt: converted.joinedAt || null,
+    lastLogin: converted.last_login || null,
+    managerId: converted.managerId || null,
+    teamId: converted.teamId || null,
   };
 }
