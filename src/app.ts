@@ -20,6 +20,7 @@ import payslipAutomationRoutes from "./routes/payslip-automation.routes";
 import leaveRoutes from "./routes/leave.routes";
 import messageRoutes from "./routes/message.routes";
 import hierarchyRoutes from "./routes/hierarchy.routes";
+import notificationRoutes from "./routes/notification.routes";
 import { startPayslipScheduler } from "./services/payslip-scheduler.service";
 import { initSocket } from "./sockets/socket";
 
@@ -126,6 +127,7 @@ app.use("/payslips/automation", payslipAutomationRoutes);
 app.use("/leave", leaveRoutes);
 app.use("/messages", messageRoutes);
 app.use("/hierarchy", hierarchyRoutes);
+app.use("/notifications", notificationRoutes);
 app.use("/auth", authRoutes);
 
 // Error handling middleware
