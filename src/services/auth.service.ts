@@ -38,11 +38,28 @@ export const loginService = async (
   username: string,
   password: string
 ) => {
-  const employee = await prisma.employee.findUnique({
+  let employee = null;
+  
+  // Try to find by username first (6-digit format like "000017")
+  employee = await prisma.employee.findUnique({
     where: {
       username,
     },
   });
+  
+  // If not found and input is numeric, try to find by employeeId
+  if (!employee && /^\d+$/.test(username)) {
+    try {
+      const employeeId = BigInt(username);
+      employee = await prisma.employee.findUnique({
+        where: {
+          employeeId,
+        },
+      });
+    } catch (error) {
+      // Invalid BigInt format, will fall through to "not found" error
+    }
+  }
 
   if (!employee) {
     throw new Error("Invalid username or password");

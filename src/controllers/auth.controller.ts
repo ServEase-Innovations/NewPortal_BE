@@ -105,20 +105,35 @@ export const login = async (
     // Only return safe, expected authentication errors
     // For unexpected errors, return generic message to prevent information leakage
     const isKnownAuthError = error.message && (
+      error.message.includes('Invalid username or password') ||
       error.message.includes('Invalid credentials') ||
       error.message.includes('Employee not found') ||
       error.message.includes('Account is inactive')
     );
     
     if (isKnownAuthError) {
-      res.status(401).json({
+      const responseData: any = {
         message: error.message,
-      });
+      };
+      
+      // Add CSRF token to error response if available
+      if (req.csrfToken) {
+        responseData.csrfToken = req.csrfToken;
+      }
+      
+      res.status(401).json(responseData);
     } else {
       // Generic message for unexpected errors (DB failures, etc.)
-      res.status(500).json({
+      const responseData: any = {
         message: "Authentication service temporarily unavailable",
-      });
+      };
+      
+      // Add CSRF token to error response if available
+      if (req.csrfToken) {
+        responseData.csrfToken = req.csrfToken;
+      }
+      
+      res.status(500).json(responseData);
     }
   }
 };
