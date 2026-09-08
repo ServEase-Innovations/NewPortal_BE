@@ -1,18 +1,21 @@
 // src/controllers/hierarchy.controller.ts
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import prisma from '../prisma';
 
 /**
  * Get employee hierarchy (manager chain + direct reports)
  * Accessible by the employee themselves
  */
-export const getMyHierarchy = async (req: Request, res: Response) => {
+export const getMyHierarchy = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const employee = req.employee;
 
-    if (!userId) {
+    if (!employee) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
+
+    const userId = employee.employeeId;
 
     // Get current user
     const currentEmployee = await prisma.employee.findUnique({
