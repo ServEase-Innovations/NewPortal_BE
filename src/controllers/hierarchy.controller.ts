@@ -140,8 +140,8 @@ function serializeEmployee(employee: any) {
     assignedRole: employee.assignedRole || null,
     assignedDepartment: employee.assignedDepartment || null,
     isActive: employee.isActive || false,
-    joinedAt: employee.joinedAt ? employee.joinedAt.toISOString() : null,
-    lastLogin: employee.last_login ? employee.last_login.toISOString() : null,
+    joinedAt: employee.joinedAt instanceof Date ? employee.joinedAt.toISOString() : employee.joinedAt,
+    lastLogin: employee.last_login instanceof Date ? employee.last_login.toISOString() : employee.last_login,
     managerId: employee.managerId ? employee.managerId.toString() : null,
     teamId: employee.teamId ? employee.teamId.toString() : null,
   };
