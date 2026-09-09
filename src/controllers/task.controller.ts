@@ -16,6 +16,7 @@ import {
   TeamNotFoundError,
   TeamAccessError,
   EmployeeNotFoundError,
+  ValidationError,
   Requester,
 } from "../services/team.service";
 
@@ -65,8 +66,16 @@ const handleServiceError = (res: Response, error: unknown) => {
   if (error instanceof EmployeeNotFoundError) {
     return res.status(404).json({ message: error.message });
   }
-  console.error("❌ Task error:", error);
-  return res.status(500).json({ message: "Something went wrong" });
+  if (error instanceof ValidationError) {
+    return res.status(400).json({ message: error.message });
+  }
+  console.error("❌ Task error:", error instanceof Error ? error.stack : error);
+  return res.status(500).json({
+    message: "Something went wrong",
+    ...(process.env.NODE_ENV !== "production" && error instanceof Error
+      ? { detail: error.message }
+      : {}),
+  });
 };
 
 export const createTask = async (req: AuthRequest<{ teamId: string }>, res: Response) => {

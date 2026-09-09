@@ -1,5 +1,5 @@
 import prisma from "../prisma";
-import { EmployeeRole } from "@prisma/client";
+import { EmployeeRole, Prisma } from "@prisma/client";
 import { TEAM_MEMBER_ROLES, isTeamMemberRole } from "../constants/team-roles";
 
 // ============================================================================
@@ -44,6 +44,60 @@ export class DuplicateTeamNameError extends Error {
     this.name = "DuplicateTeamNameError";
   }
 }
+
+/**
+ * Thrown for well-understood "the caller sent something we can't act on"
+ * cases that aren't already covered by a more specific error class (e.g. a
+ * date that fails to coerce to a real timestamp). Kept distinct from Zod's
+ * own validation errors so it can be raised from deep inside the service
+ * layer, not just at the request boundary.
+ */
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
+/**
+ * Safely turns a Date into the epoch-millis BigInt the schema stores.
+ * `Date` objects built from a bad coercion (e.g. an empty string, or a
+ * malformed value that slipped past Zod) can be an "Invalid Date", whose
+ * `.getTime()` is NaN - and `BigInt(NaN)` throws a raw, uncaught
+ * `RangeError` that previously fell straight through to the generic 500
+ * handler. This turns that into a clean, actionable 400 instead.
+ */
+export const toEpochMillis = (date: Date, fieldName: string): bigint => {
+  const millis = date.getTime();
+  if (!Number.isFinite(millis)) {
+    throw new ValidationError(`${fieldName} must be a valid date`);
+  }
+  return BigInt(millis);
+};
+
+/**
+ * Maps the Prisma error codes that can realistically surface from the
+ * operations in this file to the domain errors above, so a race condition
+ * (e.g. two requests creating the same team name at once) or a stale
+ * foreign key produces a clean 4xx instead of an unhandled 500. Anything
+ * unrecognized is re-thrown as-is for the generic handler to log.
+ */
+export const mapPrismaError = (error: unknown): never => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      throw new DuplicateTeamNameError();
+    }
+    if (error.code === "P2003") {
+      throw new EmployeeNotFoundError(
+        "One of the referenced employees no longer exists"
+      );
+    }
+    if (error.code === "P2025") {
+      throw new TeamNotFoundError();
+    }
+  }
+  throw error;
+};
 
 // ============================================================================
 // Requester / access control helpers
@@ -172,20 +226,28 @@ export const createTeamService = async (
     throw new DuplicateTeamNameError();
   }
 
-  const team = await prisma.team.create({
-    data: {
-      teamName: data.teamName,
-      projectTitle: data.projectTitle,
-      projectSummary: data.projectSummary,
-      milestoneDeadline: BigInt(data.milestoneDeadline.getTime()),
-      managerId,
-      createdAt: BigInt(Date.now()),
-      updatedAt: BigInt(Date.now()),
-    },
-    include: teamInclude,
-  });
+  const milestoneDeadline = toEpochMillis(data.milestoneDeadline, "milestoneDeadline");
 
-  return team;
+  try {
+    const team = await prisma.team.create({
+      data: {
+        teamName: data.teamName,
+        projectTitle: data.projectTitle,
+        projectSummary: data.projectSummary,
+        milestoneDeadline,
+        managerId,
+        createdAt: BigInt(Date.now()),
+        updatedAt: BigInt(Date.now()),
+      },
+      include: teamInclude,
+    });
+
+    return team;
+  } catch (error) {
+    // Covers the race where two requests pass the findUnique check above
+    // for the same teamName before either has committed its insert.
+    return mapPrismaError(error);
+  }
 };
 
 /**
@@ -276,15 +338,19 @@ export const updateTeamService = async (
   if (data.projectTitle !== undefined) updateData.projectTitle = data.projectTitle;
   if (data.projectSummary !== undefined) updateData.projectSummary = data.projectSummary;
   if (data.milestoneDeadline !== undefined) {
-    updateData.milestoneDeadline = BigInt(data.milestoneDeadline.getTime());
+    updateData.milestoneDeadline = toEpochMillis(data.milestoneDeadline, "milestoneDeadline");
   }
   if (data.managerId !== undefined) updateData.managerId = data.managerId;
 
-  return prisma.team.update({
-    where: { teamId: id },
-    data: updateData,
-    include: teamInclude,
-  });
+  try {
+    return await prisma.team.update({
+      where: { teamId: id },
+      data: updateData,
+      include: teamInclude,
+    });
+  } catch (error) {
+    return mapPrismaError(error);
+  }
 };
 
 export const deleteTeamService = async (id: string, requester: Requester) => {

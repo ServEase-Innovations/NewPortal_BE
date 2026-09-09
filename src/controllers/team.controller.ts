@@ -15,6 +15,7 @@ import {
   InvalidTeamMemberRoleError,
   EmployeeNotFoundError,
   DuplicateTeamNameError,
+  ValidationError,
   Requester,
 } from "../services/team.service";
 
@@ -79,8 +80,21 @@ const handleServiceError = (res: Response, error: unknown) => {
   if (error instanceof DuplicateTeamNameError) {
     return res.status(409).json({ message: error.message });
   }
-  console.error("❌ Team error:", error);
-  return res.status(500).json({ message: "Something went wrong" });
+  if (error instanceof ValidationError) {
+    return res.status(400).json({ message: error.message });
+  }
+  // Anything below is a genuine bug, a Prisma error we didn't recognize, or
+  // an infra failure. Log the full stack (not just the error object, which
+  // console.error can print as "[object Object]" for some error shapes) so
+  // it's actually diagnosable from server logs, and only leak the message
+  // itself to the client outside production.
+  console.error("❌ Team error:", error instanceof Error ? error.stack : error);
+  return res.status(500).json({
+    message: "Something went wrong",
+    ...(process.env.NODE_ENV !== "production" && error instanceof Error
+      ? { detail: error.message }
+      : {}),
+  });
 };
 
 export const createTeam = async (req: AuthRequest, res: Response) => {

@@ -1,7 +1,14 @@
 import prisma from "../prisma";
 import { EmployeeRole, TaskStatus, TaskPriority } from "@prisma/client";
 import { isTeamMemberRole } from "../constants/team-roles";
-import { Requester, TeamNotFoundError, TeamAccessError, EmployeeNotFoundError } from "./team.service";
+import {
+  Requester,
+  TeamNotFoundError,
+  TeamAccessError,
+  EmployeeNotFoundError,
+  toEpochMillis,
+  mapPrismaError,
+} from "./team.service";
 
 export class TaskNotFoundError extends Error {
   constructor(message = "Task not found") {
@@ -118,21 +125,27 @@ export const createTaskService = async (
   const assignedToId = data.assignedToId ?? null;
   await validateAssignee(teamId, assignedToId);
 
-  return prisma.task.create({
-    data: {
-      teamId,
-      title: data.title,
-      description: data.description,
-      priority: data.priority ?? TaskPriority.Medium,
-      status: data.status ?? TaskStatus.Todo,
-      dueDate: data.dueDate ? BigInt(data.dueDate.getTime()) : undefined,
-      assignedToId: assignedToId ?? undefined,
-      createdById: requester.employeeId,
-      createdAt: BigInt(Date.now()),
-      updatedAt: BigInt(Date.now()),
-    },
-    include: taskInclude,
-  });
+  const dueDate = data.dueDate ? toEpochMillis(data.dueDate, "dueDate") : undefined;
+
+  try {
+    return await prisma.task.create({
+      data: {
+        teamId,
+        title: data.title,
+        description: data.description,
+        priority: data.priority ?? TaskPriority.Medium,
+        status: data.status ?? TaskStatus.Todo,
+        dueDate,
+        assignedToId: assignedToId ?? undefined,
+        createdById: requester.employeeId,
+        createdAt: BigInt(Date.now()),
+        updatedAt: BigInt(Date.now()),
+      },
+      include: taskInclude,
+    });
+  } catch (error) {
+    return mapPrismaError(error);
+  }
 };
 
 export const listTasksService = async (
@@ -187,7 +200,7 @@ export const updateTaskService = async (
   if (data.description !== undefined) updateData.description = data.description;
   if (data.priority !== undefined) updateData.priority = data.priority;
   if (data.dueDate !== undefined) {
-    updateData.dueDate = data.dueDate ? BigInt(data.dueDate.getTime()) : null;
+    updateData.dueDate = data.dueDate ? toEpochMillis(data.dueDate, "dueDate") : null;
   }
   if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId;
 
@@ -201,11 +214,15 @@ export const updateTaskService = async (
         : task.completedAt;
   }
 
-  return prisma.task.update({
-    where: { taskId },
-    data: updateData,
-    include: taskInclude,
-  });
+  try {
+    return await prisma.task.update({
+      where: { taskId },
+      data: updateData,
+      include: taskInclude,
+    });
+  } catch (error) {
+    return mapPrismaError(error);
+  }
 };
 
 /**
