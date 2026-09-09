@@ -46,6 +46,10 @@ model Employee {
   subordinates Employee[] @relation("ManagerSubordinates")
   team         Team?      @relation(fields: [teamId], references: [teamId])
 
+  managedTeams  Team[] @relation("TeamManagerOwner")
+  tasksAssigned Task[] @relation("TaskAssignee")
+  tasksCreated  Task[] @relation("TaskCreatedBy")
+
   conversationsCreated     Conversation[]             @relation("ConversationCreatedBy")
   conversationParticipant  ConversationParticipant[]
   sentMessages             Message[]                  @relation("MessageSender")
@@ -120,12 +124,68 @@ model Team {
   projectTitle      String  @map("project_title")
   projectSummary    String? @map("project_summary")
   milestoneDeadline BigInt  @map("milestone_deadline")
-  createdAt         BigInt  @map("created_at")
-  updatedAt         BigInt  @map("updated_at")
 
+  // The manager who owns/oversees this team. A manager may own several
+  // teams; only this manager (or SuperAdmin/HR) may administer the team.
+  managerId BigInt @map("manager_id")
+
+  createdAt BigInt @map("created_at")
+  updatedAt BigInt @map("updated_at")
+
+  manager   Employee   @relation("TeamManagerOwner", fields: [managerId], references: [employeeId], onDelete: Restrict)
   employees Employee[]
+  tasks     Task[]
 
+  @@index([managerId], map: "idx_team_manager")
   @@map("teams")
+}
+
+// ============================================================================
+// TASK MANAGEMENT / PROGRESS TRACKING
+// ============================================================================
+
+model Task {
+  taskId      BigInt       @id @default(autoincrement()) @map("task_id")
+  teamId      String       @map("team_id")
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(Todo)
+  priority    TaskPriority @default(Medium)
+
+  // Nullable: a task may sit unassigned in the backlog. When set, the
+  // assignee must be an active member of this team holding one of the
+  // three permitted staff roles (Developer, Marketing, CustomStaff) -
+  // enforced in the service layer, not just the client.
+  assignedToId BigInt? @map("assigned_to_id")
+  createdById  BigInt  @map("created_by_id")
+
+  dueDate     BigInt? @map("due_date")
+  completedAt BigInt? @map("completed_at")
+  createdAt   BigInt  @map("created_at")
+  updatedAt   BigInt  @map("updated_at")
+
+  team       Team      @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  assignedTo Employee? @relation("TaskAssignee", fields: [assignedToId], references: [employeeId], onDelete: SetNull)
+  createdBy  Employee  @relation("TaskCreatedBy", fields: [createdById], references: [employeeId], onDelete: Restrict)
+
+  @@index([teamId, status], map: "idx_task_team_status")
+  @@index([assignedToId], map: "idx_task_assignee")
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  Todo
+  InProgress
+  InReview
+  Done
+  Blocked
+}
+
+enum TaskPriority {
+  Low
+  Medium
+  High
+  Urgent
 }
 
 model Attendance {

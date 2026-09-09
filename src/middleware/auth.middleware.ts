@@ -1,9 +1,22 @@
 import { Request, Response, NextFunction } from "express";
+import { ParamsDictionary } from "express-serve-static-core";
+import { ParsedQs } from "qs";
 import jwt from "jsonwebtoken";
 import { EmployeeRole } from "@prisma/client";
 
-// Extend Request interface to include employee
-export interface AuthRequest extends Request {
+// Extend Request interface to include employee. Generic over the same
+// params/body/query type arguments as Express's own Request so call sites
+// can narrow route params the same way they would with a plain Request,
+// e.g. `AuthRequest<{ id: string }>` - without that, `req.params.id` widens
+// to `string | string[]` under Express 5's ParamsDictionary. Every existing
+// bare `AuthRequest` usage keeps working unchanged via these defaults.
+export interface AuthRequest<
+  P = ParamsDictionary,
+  ResBody = any,
+  ReqBody = any,
+  ReqQuery = ParsedQs,
+  Locals extends Record<string, any> = Record<string, any>
+> extends Request<P, ResBody, ReqBody, ReqQuery, Locals> {
   employee?: {
     employeeId: string;
     username: string;
