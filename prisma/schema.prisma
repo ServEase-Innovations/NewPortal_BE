@@ -63,6 +63,7 @@ model Employee {
   conversationsCreated     Conversation[]             @relation("ConversationCreatedBy")
   conversationParticipant  ConversationParticipant[]
   sentMessages             Message[]                  @relation("MessageSender")
+  notifications            Notification[]             @relation("EmployeeNotifications")
 
   @@map("employees")
 }
@@ -149,7 +150,7 @@ model Attendance {
   shiftStatus        AttendanceStatus @default(Working) @map("shift_status")
   clockInTimestamp   BigInt?          @map("clock_in_timestamp")
   clockOutTimestamp  BigInt?          @map("clock_out_timestamp")
-  totalHoursComputed Decimal          @default(8.00) @map("total_hours_computed") @db.Decimal(10, 2)
+  totalHoursComputed Decimal          @default(0.00) @map("total_hours_computed") @db.Decimal(10, 2)
 
   employee Employee @relation(fields: [employeeId], references: [employeeId], onDelete: Cascade)
 
@@ -507,3 +508,40 @@ model LeaveRequest {
   @@index([reviewedById], map: "idx_leave_request_reviewed_by")
   @@map("leave_requests")
 }
+
+// Notification model for in-app notifications
+model Notification {
+  notificationId BigInt           @id @default(autoincrement()) @map("notification_id")
+  employeeId     BigInt           @map("employee_id")
+  
+  // Notification content
+  title          String           // Short title (e.g., "Leave request approved")
+  detail         String           @db.Text // Detailed message
+  type           NotificationType // success, warning, info, error
+  
+  // Optional link/action
+  actionUrl      String?          @map("action_url") @db.Text // Link to relevant page
+  actionLabel    String?          @map("action_label") // Button text (e.g., "View Details")
+  
+  // Read status
+  isRead         Boolean          @default(false) @map("is_read")
+  readAt         BigInt?          @map("read_at")
+  
+  // Metadata
+  createdAt      BigInt           @map("created_at")
+  expiresAt      BigInt?          @map("expires_at") // Optional expiry for temporary notifications
+  
+  employee       Employee         @relation("EmployeeNotifications", fields: [employeeId], references: [employeeId], onDelete: Cascade)
+  
+  @@index([employeeId, isRead, createdAt], map: "idx_notification_employee_read_created")
+  @@index([employeeId, createdAt], map: "idx_notification_employee_created")
+  @@map("notifications")
+}
+
+enum NotificationType {
+  Success  // Green - positive actions (leave approved, task completed)
+  Warning  // Amber - attention needed (timesheet reminder, pending approval)
+  Info     // Blue - informational (new policy, announcement)
+  Error    // Red - errors or rejections (leave rejected, failed action)
+}
+

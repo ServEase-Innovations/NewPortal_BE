@@ -19,6 +19,9 @@ import payslipRoutes from "./routes/payslip.routes";
 import payslipAutomationRoutes from "./routes/payslip-automation.routes";
 import leaveRoutes from "./routes/leave.routes";
 import messageRoutes from "./routes/message.routes";
+import hierarchyRoutes from "./routes/hierarchy.routes";
+import notificationRoutes from "./routes/notification.routes";
+import { fixAttendanceDefaults } from "./controllers/attendance-fix.controller";
 import { startPayslipScheduler } from "./services/payslip-scheduler.service";
 import { initSocket } from "./sockets/socket";
 
@@ -124,7 +127,12 @@ app.use("/payslips", payslipRoutes);
 app.use("/payslips/automation", payslipAutomationRoutes);
 app.use("/leave", leaveRoutes);
 app.use("/messages", messageRoutes);
+app.use("/hierarchy", hierarchyRoutes);
+app.use("/notifications", notificationRoutes);
 app.use("/auth", authRoutes);
+
+// One-time fix endpoint for attendance defaults
+app.post("/fix-attendance", fixAttendanceDefaults);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

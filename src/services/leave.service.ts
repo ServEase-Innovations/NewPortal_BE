@@ -1,5 +1,10 @@
 import prisma from "../prisma";
 import { Prisma, LeaveType, LeaveRequestStatus } from "@prisma/client";
+import {
+  notifyLeaveApproved,
+  notifyLeaveRejected,
+  notifyManagerNewLeaveRequest,
+} from "./notification.service";
 
 // ============================================================================
 // LEAVE POLICY SERVICE
@@ -317,6 +322,28 @@ export const createLeaveRequestService = async (
     "reserve"
   );
 
+  // Notify manager if employee has a manager
+  if (leaveRequest.employee.managerId) {
+    try {
+      const fromDateStr = new Date(Number(data.fromDate)).toLocaleDateString();
+      const toDateStr = new Date(Number(data.toDate)).toLocaleDateString();
+      const totalDays = typeof data.totalDays === 'number' ? data.totalDays : Number(data.totalDays);
+      
+      await notifyManagerNewLeaveRequest(
+        leaveRequest.employee.managerId,
+        leaveRequest.employee.fullName,
+        data.leaveType,
+        fromDateStr,
+        toDateStr,
+        totalDays,
+        leaveRequest.leaveRequestId
+      );
+    } catch (error) {
+      console.error("Error sending manager notification:", error);
+      // Don't fail the entire operation if notification fails
+    }
+  }
+
   return leaveRequest;
 };
 
@@ -486,6 +513,26 @@ export const approveLeaveRequestService = async (
     "confirm"
   );
 
+  // Send notification to employee
+  try {
+    const fromDateStr = new Date(Number(leaveRequest.fromDate)).toLocaleDateString();
+    const toDateStr = new Date(Number(leaveRequest.toDate)).toLocaleDateString();
+    
+    await notifyLeaveApproved(
+      leaveRequest.employeeId,
+      updatedRequest.employee.fullName,
+      leaveRequest.leaveType,
+      fromDateStr,
+      toDateStr,
+      Number(leaveRequest.totalDays),
+      updatedRequest.reviewedBy!.fullName,
+      leaveRequestId
+    );
+  } catch (error) {
+    console.error("Error sending leave approval notification:", error);
+    // Don't fail the entire operation if notification fails
+  }
+
   return updatedRequest;
 };
 
@@ -558,6 +605,27 @@ export const rejectLeaveRequestService = async (
     Number(leaveRequest.totalDays),
     "release"
   );
+
+  // Send notification to employee
+  try {
+    const fromDateStr = new Date(Number(leaveRequest.fromDate)).toLocaleDateString();
+    const toDateStr = new Date(Number(leaveRequest.toDate)).toLocaleDateString();
+    
+    await notifyLeaveRejected(
+      leaveRequest.employeeId,
+      updatedRequest.employee.fullName,
+      leaveRequest.leaveType,
+      fromDateStr,
+      toDateStr,
+      Number(leaveRequest.totalDays),
+      updatedRequest.reviewedBy!.fullName,
+      reviewComments,
+      leaveRequestId
+    );
+  } catch (error) {
+    console.error("Error sending leave rejection notification:", error);
+    // Don't fail the entire operation if notification fails
+  }
 
   return updatedRequest;
 };
